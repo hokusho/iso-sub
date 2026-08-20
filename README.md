@@ -1,6 +1,6 @@
 # 🎬 ISO SUB - Estúdio de Legendas Animadas & Virais
 
-> Aplicação Web Completa (Frontend React/Vite + Backend Node.js/FFmpeg/Whisper) para criação, customização e renderização profissional de legendas dinâmicas estilo Hormozi, MrBeast e Submagic.
+> Aplicação Web Completa (Frontend React/Vite + Backend Node.js/FFmpeg/Whisper) para criação, customização e renderização de legendas dinâmicas.
 
 ---
 
