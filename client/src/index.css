@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    border-color: #cbd5e1;
+  }
+  
+  body {
+    background-color: #f4f5f7;
+    color: #111827;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Minimalist clean scrollbars with neutral gray */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #e5e7eb;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #808080;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #666666;
+}
+
+/* Clean solid range sliders (No gradients) with 50% neutral gray track */
+input[type="range"] {
+  -webkit-appearance: none;
+  background: #d1d5db;
+  border-radius: 9999px;
+  height: 7px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #18181b;
+  border: 2px solid #808080;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.1s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  background: #000000;
+  border-color: #555555;
+}
+
+/* 50% Neutral Gray (#808080 / RGB 128, 128, 128) Studio Stage for Video Inspection */
+.stage-neutral-50 {
+  background-color: #808080;
+}
+
+/* Solid Flat Panels & Cards */
+.panel-white {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.panel-subtle {
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+}
+
+.glass-panel {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+.glass-card {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+}

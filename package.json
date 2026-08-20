@@ -1,0 +1,25 @@
+{
+  "name": "legendas-animadas-studio",
+  "version": "1.0.0",
+  "description": "SaaS / Web App de Edição e Renderização de Legendas Animadas com FFmpeg, Whisper e ProRes 4444 Alpha",
+  "main": "server/dist/index.js",
+  "scripts": {
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,magenta\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": ["subtitles", "karaoke", "ffmpeg", "whisper", "prores", "capcut", "opusclip"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "nodemon": "^3.1.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
