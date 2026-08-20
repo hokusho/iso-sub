@@ -1,6 +1,6 @@
 # 🎬 ISO SUB - Estúdio de Legendas Animadas & Virais
 
-> Aplicação Web Completa (Frontend React/Vite + Backend Node.js/FFmpeg/Whisper) para criação, customização e renderização de legendas dinâmicas.
+> Aplicação Web Completa (Frontend React/Vite + Backend Node.js/FFmpeg/Whisper) para criação, customização e renderização profissional de legendas dinâmicas estilo Hormozi, MrBeast e Submagic.
 
 ---
 
@@ -36,6 +36,37 @@ Basta dar **duplo clique** no arquivo:
 O navegador abrirá automaticamente em:
 - **Frontend**: [http://localhost:5173](http://localhost:5173) ou [http://localhost:5174](http://localhost:5174)
 - **Backend API**: [http://localhost:5000](http://localhost:5000)
+
+---
+
+## 🔑 Como Obter as Chaves de API (Transcrição Automática Whisper)
+
+O aplicativo utiliza modelos Whisper de IA para transcrever o áudio do vídeo palavra por palavra em segundos. Suas chaves de API ficam salvas **apenas no armazenamento privado do seu navegador (localStorage)** e nunca são enviadas ou salvas no repositório.
+
+### Opção 1: Groq Cloud (Recomendada — 100% Gratuita & Ultrarrápida ⚡)
+A API da Groq transcreve vídeos de 1 minuto em menos de 2 segundos com o modelo `whisper-large-v3-turbo` sem custo:
+1. Acesse o console da Groq: **[console.groq.com](https://console.groq.com)**
+2. Crie uma conta gratuita (com Google ou GitHub).
+3. No menu lateral esquerdo, clique em **API Keys**.
+4. Clique no botão **`+ Create API Key`**.
+5. Dê um nome (ex: `ISO-SUB`) e copie a chave gerada (começa com `gsk_...`).
+
+---
+
+### Opção 2: OpenAI Whisper (Opcional)
+Se preferir utilizar a API oficial da OpenAI:
+1. Acesse: **[platform.openai.com/api-keys](https://platform.openai.com/api-keys)**
+2. Crie sua conta ou faça login.
+3. Clique em **`Create new secret key`**.
+4. Copie a chave gerada (começa com `sk-...`).
+
+---
+
+### 📌 Onde Inserir a Chave no Aplicativo:
+1. Abra o **ISO SUB** no seu navegador.
+2. No menu superior (Navbar), clique no ícone de chave / configurações (**`🔑 API Keys`**).
+3. Cole a sua chave da **Groq** ou da **OpenAI** no campo correspondente e clique em **`Salvar Chaves`**.
+4. Pronto! O botão **`Gerar Legendas`** agora transcreverá qualquer vídeo instantaneamente.
 
 ---
 
