@@ -361,6 +361,9 @@ export const App: React.FC = () => {
         setDuration(demoDuration);
         setWaveformPeaks(demoPeaks);
         setBlocks(demoBlocks);
+        setOriginalBlocks(demoBlocks);
+        setTranslatedBlocks(null);
+        setActiveSubtitleVersion('original');
         setMetadata({
           duration: demoDuration,
           width: 1080,

@@ -314,8 +314,11 @@ export async function translateSubtitleBlocks(
 ): Promise<SubtitleBlock[]> {
   if (!blocks || blocks.length === 0) return [];
 
-  const groqKey = apiKey || GROQ_API_KEY;
-  const openaiKey = apiKey || OPENAI_API_KEY;
+  const isGroqKey = apiKey?.startsWith('gsk_');
+  const isOpenAiKey = apiKey?.startsWith('sk-');
+
+  const groqKey = isGroqKey ? apiKey : (!isOpenAiKey ? (GROQ_API_KEY || apiKey) : undefined);
+  const openaiKey = isOpenAiKey ? apiKey : (!isGroqKey ? (OPENAI_API_KEY || apiKey) : undefined);
 
   const langMap: Record<string, string> = {
     en: 'English',
@@ -325,18 +328,38 @@ export async function translateSubtitleBlocks(
     de: 'German',
     it: 'Italian',
     ja: 'Japanese',
-    zh: 'Chinese (Mandarin)'
+    zh: 'Chinese (Simplified)'
   };
   const targetLangName = langMap[targetLanguage] || targetLanguage;
 
   const phrases = blocks.map(b => b.text.trim());
   let translatedPhrases: string[] = [];
 
+  // Helper for Google GTX Translation
+  const translateViaGoogle = async (texts: string[], target: string): Promise<string[]> => {
+    const results: string[] = [];
+    for (const phrase of texts) {
+      try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${target}&dt=t&q=${encodeURIComponent(phrase)}`;
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const d = (await resp.json()) as any;
+          if (Array.isArray(d) && Array.isArray(d[0])) {
+            results.push(d[0].map((item: any) => item[0]).join('') || phrase);
+            continue;
+          }
+        }
+      } catch {}
+      results.push(phrase);
+    }
+    return results;
+  };
+
   // Method 1: Groq AI
   if (groqKey) {
     try {
-      const prompt = `You are a professional subtitle translator. Translate the following list of subtitle phrases into ${targetLangName}.
-Return ONLY a valid JSON array of strings containing the translations in the exact same order as the input array.
+      const prompt = `You are an expert subtitle translator. Translate the following list of subtitle phrases into ${targetLangName}.
+Return ONLY a valid JSON array of translated strings in the EXACT same order and length as the input. Do not include extra text.
 Format: ["translation 1", "translation 2", ...]
 
 Input JSON array:
@@ -357,8 +380,9 @@ ${JSON.stringify(phrases)}`;
 
       if (response.ok) {
         const data = (await response.json()) as any;
-        const content = data.choices?.[0]?.message?.content || '';
-        const match = content.match(/\[[\s\S]*\]/);
+        const rawContent = data.choices?.[0]?.message?.content || '';
+        const cleanContent = rawContent.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const match = cleanContent.match(/\[[\s\S]*\]/);
         if (match) {
           const parsed = JSON.parse(match[0]);
           if (Array.isArray(parsed) && parsed.length === phrases.length) {
@@ -374,8 +398,8 @@ ${JSON.stringify(phrases)}`;
   // Method 2: OpenAI Fallback
   if (translatedPhrases.length === 0 && openaiKey) {
     try {
-      const prompt = `You are a professional subtitle translator. Translate the following list of subtitle phrases into ${targetLangName}.
-Return ONLY a valid JSON array of strings containing the translations in the exact same order as the input array.
+      const prompt = `You are an expert subtitle translator. Translate the following list of subtitle phrases into ${targetLangName}.
+Return ONLY a valid JSON array of translated strings in the EXACT same order and length as the input.
 Format: ["translation 1", "translation 2", ...]
 
 Input JSON array:
@@ -396,8 +420,9 @@ ${JSON.stringify(phrases)}`;
 
       if (response.ok) {
         const data = (await response.json()) as any;
-        const content = data.choices?.[0]?.message?.content || '';
-        const match = content.match(/\[[\s\S]*\]/);
+        const rawContent = data.choices?.[0]?.message?.content || '';
+        const cleanContent = rawContent.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const match = cleanContent.match(/\[[\s\S]*\]/);
         if (match) {
           const parsed = JSON.parse(match[0]);
           if (Array.isArray(parsed) && parsed.length === phrases.length) {
@@ -410,22 +435,9 @@ ${JSON.stringify(phrases)}`;
     }
   }
 
-  // Method 3: Public Free Translation API fallback
+  // Method 3: High-reliability Google Translate fallback
   if (translatedPhrases.length === 0) {
-    try {
-      for (const phrase of phrases) {
-        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(phrase)}&langpair=pt|${targetLanguage}`;
-        const resp = await fetch(url);
-        if (resp.ok) {
-          const d = (await resp.json()) as any;
-          translatedPhrases.push(d.responseData?.translatedText || phrase);
-        } else {
-          translatedPhrases.push(phrase);
-        }
-      }
-    } catch {
-      translatedPhrases = phrases;
-    }
+    translatedPhrases = await translateViaGoogle(phrases, targetLanguage);
   }
 
   // Reconstruct SubtitleBlocks with translated words and matching timestamps
