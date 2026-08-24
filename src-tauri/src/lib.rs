@@ -19,27 +19,29 @@ pub fn run() {
           .and_then(|p| p.parent().map(|p| p.to_path_buf()));
 
         if let Some(dir) = exe_dir {
-          let server_path = dir.join("server-x86_64-pc-windows-msvc.exe");
-          let alt_server_path = dir.join("bin").join("server-x86_64-pc-windows-msvc.exe");
-          let target = if server_path.exists() {
-            Some(server_path)
-          } else if alt_server_path.exists() {
-            Some(alt_server_path)
-          } else {
-            None
-          };
+          let candidates = [
+            dir.join("server-x86_64-pc-windows-msvc.exe"),
+            dir.join("bin").join("server-x86_64-pc-windows-msvc.exe"),
+            dir.join("server.exe"),
+            dir.join("bin").join("server.exe"),
+            dir.join("resources").join("bin").join("server-x86_64-pc-windows-msvc.exe"),
+            dir.join("resources").join("server-x86_64-pc-windows-msvc.exe"),
+          ];
 
-          if let Some(path) = target {
-            #[cfg(target_os = "windows")]
-            use std::os::windows::process::CommandExt;
-            #[cfg(target_os = "windows")]
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
+          for path in &candidates {
+            if path.exists() {
+              #[cfg(target_os = "windows")]
+              use std::os::windows::process::CommandExt;
+              #[cfg(target_os = "windows")]
+              const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-            let mut cmd = Command::new(path);
-            #[cfg(target_os = "windows")]
-            cmd.creation_flags(CREATE_NO_WINDOW);
+              let mut cmd = Command::new(path);
+              #[cfg(target_os = "windows")]
+              cmd.creation_flags(CREATE_NO_WINDOW);
 
-            let _ = cmd.spawn();
+              let _ = cmd.spawn();
+              break;
+            }
           }
         }
       });

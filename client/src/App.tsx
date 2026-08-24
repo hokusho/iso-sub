@@ -35,6 +35,7 @@ import { getSavedLicense, validateLicenseOnline, clearSavedLicense, ClientLicens
 import { ExportModal } from './components/Export/ExportModal';
 import { ProcessingModal, ProcessStep } from './components/Common/ProcessingModal';
 import { ToastContainer, ToastMessage } from './components/Common/Toast';
+import { apiEndpoint, resolveMediaUrl } from './utils/api';
 import { DEFAULT_STYLE, PRESETS } from './presets';
 import {
   SubtitleBlock,
@@ -175,7 +176,7 @@ export const App: React.FC = () => {
 
   const fetchCacheInfo = async () => {
     try {
-      const url = fileId ? `/api/cache-info?currentFileId=${encodeURIComponent(fileId)}` : '/api/cache-info';
+      const url = apiEndpoint(fileId ? `/api/cache-info?currentFileId=${encodeURIComponent(fileId)}` : '/api/cache-info');
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -315,7 +316,7 @@ export const App: React.FC = () => {
         setStatusMessage('Extraindo faixa de áudio mono e calculando waveform...');
       }, 800);
 
-      const res = await fetch('/api/upload', {
+      const res = await fetch(apiEndpoint('/api/upload'), {
         method: 'POST',
         body: formData
       });
@@ -332,7 +333,7 @@ export const App: React.FC = () => {
       }
 
       const data = await res.json();
-      const resolvedUrl = data.fileUrl || `/storage/uploads/${data.fileId}`;
+      const resolvedUrl = resolveMediaUrl(data.fileUrl || `/storage/uploads/${data.fileId}`);
       setFileId(data.fileId);
       setFileName(data.originalName || file.name);
       setVideoUrl(resolvedUrl);
@@ -353,8 +354,8 @@ export const App: React.FC = () => {
     } catch (err: any) {
       if (progressTimer) clearTimeout(progressTimer);
       setProcessStep(null);
-      addToast('error', 'Erro no processamento', err.message || 'Falha ao conectar com o backend');
-      console.error('Upload error:', err);
+      console.error('File upload/processing error:', err);
+      addToast('error', 'Erro no processamento', err.message || 'Falha ao processar arquivo');
     }
   };
 
@@ -470,7 +471,7 @@ export const App: React.FC = () => {
       const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
       const openaiKey = localStorage.getItem('OPENAI_API_KEY') || '';
 
-      const res = await fetch('/api/transcribe', {
+      const res = await fetch(apiEndpoint('/api/transcribe'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -729,7 +730,7 @@ export const App: React.FC = () => {
 
   const handleOpenExplorer = async () => {
     try {
-      const res = await fetch('/api/open-folder', { method: 'POST' });
+      const res = await fetch(apiEndpoint('/api/open-folder'), { method: 'POST' });
       if (res.ok) {
         addToast('success', 'Windows Explorer aberto', 'Pasta de renders visualizada no Explorer.');
       }
@@ -753,7 +754,7 @@ export const App: React.FC = () => {
       const formData = new FormData();
       formData.append('subtitleFile', file);
 
-      const res = await fetch('/api/parse-subtitles', {
+      const res = await fetch(apiEndpoint('/api/parse-subtitles'), {
         method: 'POST',
         body: formData
       });
@@ -794,7 +795,7 @@ export const App: React.FC = () => {
       const groqKey = localStorage.getItem('GROQ_API_KEY') || '';
       const openaiKey = localStorage.getItem('OPENAI_API_KEY') || '';
 
-      const res = await fetch('/api/translate', {
+      const res = await fetch(apiEndpoint('/api/translate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -849,7 +850,7 @@ export const App: React.FC = () => {
   const handleClearCache = async () => {
     try {
       setIsClearingCache(true);
-      const res = await fetch('/api/clear-cache', {
+      const res = await fetch(apiEndpoint('/api/clear-cache'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ currentFileId: fileId || undefined })
@@ -935,7 +936,7 @@ export const App: React.FC = () => {
                 <div className="w-full flex-1 flex items-center justify-center bg-[#808080] rounded-3xl p-3 shadow-inner border-2 border-[#666666] overflow-hidden min-h-0">
                   <CanvasPreview
                     videoRef={videoRef}
-                    videoUrl={videoUrl || (fileId ? `/storage/uploads/${fileId}` : null)}
+                    videoUrl={videoUrl ? resolveMediaUrl(videoUrl) : (fileId ? resolveMediaUrl(`/storage/uploads/${fileId}`) : null)}
                     blocks={blocks}
                     style={style}
                     currentTime={currentTime}

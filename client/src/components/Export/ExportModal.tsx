@@ -14,6 +14,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { SubtitleBlock, SubtitleStyle, VideoMetadata, RenderJobProgress } from '../../types';
+import { apiEndpoint, resolveMediaUrl } from '../../utils/api';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -77,7 +78,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       const baseName = getCleanBaseName();
 
       if (exportType === 'mp4') {
-        const res = await fetch('/api/render/mp4', {
+        const res = await fetch(apiEndpoint('/api/render/mp4'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -96,7 +97,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         const data = await res.json();
         listenToProgress(data.jobId);
       } else if (exportType === 'prores') {
-        const res = await fetch('/api/render/prores', {
+        const res = await fetch(apiEndpoint('/api/render/prores'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -119,7 +120,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         listenToProgress(data.jobId);
       } else if (exportType === 'subtitles') {
         // Direct download subtitle file
-        const res = await fetch('/api/export/subtitles', {
+        const res = await fetch(apiEndpoint('/api/export/subtitles'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -150,7 +151,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const listenToProgress = (jobId: string) => {
-    const eventSource = new EventSource(`/api/progress/${jobId}`);
+    const eventSource = new EventSource(apiEndpoint(`/api/progress/${jobId}`));
 
     eventSource.onmessage = (e) => {
       try {
@@ -177,7 +178,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   const handleOpenExplorer = async () => {
     try {
-      const res = await fetch('/api/open-folder', {
+      const res = await fetch(apiEndpoint('/api/open-folder'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -245,7 +246,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 </button>
 
                 <a
-                  href={`/storage/renders/${renderJob.outputFileName}`}
+                  href={resolveMediaUrl(`/storage/renders/${renderJob.outputFileName}`)}
                   download={renderJob.outputFileName}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-bold border border-slate-200 transition active:scale-95"
                 >

@@ -79,12 +79,14 @@ export async function checkForAppUpdates(): Promise<AppUpdateInfo | null> {
   }
 }
 
+import { apiEndpoint } from '../utils/api';
+
 /**
  * Aplica a atualização com 1 clique no backend e recarrega o app
  */
 export async function applyAppUpdate(bundleUrl: string): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await fetch('/api/updates/apply', {
+    const res = await fetch(apiEndpoint('/api/updates/apply'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bundleUrl })
