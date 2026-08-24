@@ -11,7 +11,8 @@ import {
   Layers,
   Wand2,
   FolderOpen,
-  MousePointerClick
+  MousePointerClick,
+  X
 } from 'lucide-react';
 import { Navbar, CacheInfo } from './components/Navbar';
 import isoLogo from './assets/iso3.png';
@@ -106,6 +107,7 @@ export const App: React.FC = () => {
   // Hot-Update / OTA State
   const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
+  const [isUpdateBalloonOpen, setIsUpdateBalloonOpen] = useState<boolean>(true);
 
   // License / Serial State
   const [currentLicense, setCurrentLicense] = useState<ClientLicenseInfo | null>(() => getSavedLicense());
@@ -118,6 +120,7 @@ export const App: React.FC = () => {
       const info = await checkForAppUpdates();
       if (info && info.hasUpdate) {
         setUpdateInfo(info);
+        setIsUpdateBalloonOpen(true);
         if (info.mandatory) {
           setIsUpdateModalOpen(true);
         }
@@ -1207,9 +1210,58 @@ export const App: React.FC = () => {
                   @hokusho
                 </a>
               </p>
-              <span className="text-[9.5px] font-mono font-bold text-neutral-400">
-                v1.1.5
-              </span>
+              {/* Version & Update Notification Balloon */}
+              <div className="relative flex items-center">
+                {updateInfo?.hasUpdate ? (
+                  <>
+                    {/* Floating Notification Balloon */}
+                    {isUpdateBalloonOpen && (
+                      <div className="absolute bottom-full right-0 mb-2 w-56 bg-neutral-950 text-white border-2 border-red-500 rounded-2xl p-2.5 shadow-2xl z-40 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <div className="flex items-start justify-between gap-1.5 pb-1">
+                          <div className="flex items-center gap-1.5 text-red-400 font-black text-[11px]">
+                            <span>🚀 Atualização v{updateInfo.latestVersion}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsUpdateBalloonOpen(false);
+                            }}
+                            className="text-neutral-400 hover:text-white p-0.5 rounded transition cursor-pointer"
+                            title="Fechar aviso"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-neutral-300 font-medium leading-tight mb-2">
+                          Uma nova versão está disponível! Clique para ver as novidades e atualizar.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setIsUpdateModalOpen(true)}
+                          className="w-full py-1 px-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-[10px] font-black transition active:scale-95 text-center shadow-xs cursor-pointer"
+                        >
+                          Ver Atualização
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Red Pulsing Version Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={() => setIsUpdateModalOpen(true)}
+                      title={`Nova versão ${updateInfo.latestVersion} disponível! Clique para atualizar.`}
+                      className="text-[9.5px] font-mono font-black text-red-600 hover:text-red-700 underline underline-offset-2 animate-pulse cursor-pointer transition flex items-center gap-1"
+                    >
+                      <span>v1.1.5 (v{updateInfo.latestVersion} disponível)</span>
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-[9.5px] font-mono font-bold text-neutral-400">
+                    v1.1.5
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

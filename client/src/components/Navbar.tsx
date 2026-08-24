@@ -90,26 +90,11 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="flex items-center gap-3.5">
         <div className="flex flex-col">
           <div className="flex items-center gap-3">
-            <div className="flex items-baseline gap-1.5">
+            <div className="flex items-baseline">
               <h1 className="text-2xl tracking-tight leading-none">
                 <span className="font-black text-[#B91C1C]">ISO</span>{' '}
                 <span className="font-semibold text-neutral-600">SUB</span>
               </h1>
-              <span className="text-[10px] font-black text-neutral-600 bg-neutral-100 border border-neutral-300 px-1.5 py-0.5 rounded-md leading-none">
-                v1.1.5
-              </span>
-
-              {/* Hot-Update Available Button */}
-              {updateInfo?.hasUpdate && (
-                <button
-                  type="button"
-                  onClick={onOpenUpdate}
-                  title={`Nova versão ${updateInfo.latestVersion} disponível! Clique para atualizar.`}
-                  className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black px-2 py-0.5 rounded-md animate-pulse shadow-xs cursor-pointer transition active:scale-95 ml-1"
-                >
-                  <span>🚀 Atualizar (v{updateInfo.latestVersion})</span>
-                </button>
-              )}
             </div>
 
             {/* Live Visual Status Badge */}
