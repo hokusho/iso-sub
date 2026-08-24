@@ -42,6 +42,21 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
+// Serve frontend client/dist if built (for desktop/production single-port access)
+const CLIENT_DIST = path.resolve(__dirname, '../../client/dist');
+if (fs.existsSync(CLIENT_DIST)) {
+  app.use(express.static(CLIENT_DIST));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/storage')) {
+      const indexFile = path.resolve(CLIENT_DIST, 'index.html');
+      if (fs.existsSync(indexFile)) {
+        return res.sendFile(indexFile);
+      }
+    }
+    next();
+  });
+}
+
 app.listen(PORT, HOST, () => {
   console.log(`🚀 Animated Subtitles Server running on http://${HOST}:${PORT}`);
   console.log(`📁 Media storage path: ${STORAGE_DIR}`);

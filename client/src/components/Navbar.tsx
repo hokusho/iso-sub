@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Upload,
-  Sparkles,
   Download,
   Key,
   FolderOpen,
@@ -39,6 +38,8 @@ interface NavbarProps {
   onOpenExplorer: () => void;
   onOpenExport: () => void;
   onClearCache: () => void;
+  currentLicense?: any;
+  onOpenLicense?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -55,7 +56,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenApiKeys,
   onOpenExplorer,
   onOpenExport,
-  onClearCache
+  onClearCache,
+  currentLicense,
+  onOpenLicense
 }) => {
   const [isCacheMenuOpen, setIsCacheMenuOpen] = useState(false);
   const cacheRef = useRef<HTMLDivElement | null>(null);
@@ -204,16 +207,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         )}
 
-        {/* Transcribe Button */}
-        <button
-          onClick={onTranscribeClick}
-          disabled={!fileName || isTranscribing}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-black disabled:opacity-40 text-white text-xs font-extrabold transition transform active:scale-95 shadow-sm"
-        >
-          <Sparkles className="w-4 h-4 text-amber-300" />
-          <span>{isTranscribing ? 'Transcrevendo...' : 'Gerar Legendas'}</span>
-        </button>
-
         <div className="h-7 w-px bg-neutral-300 mx-0.5" />
 
         {/* Quick Tool: Search & Replace */}
@@ -228,11 +221,29 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Quick Tool: API Keys Settings */}
         <button
           onClick={onOpenApiKeys}
-          title="Configurar Chaves de API (Groq / OpenAI)"
+          title="Configurar Chave Gratuita da Groq (Whisper)"
           className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition active:scale-95"
         >
           <Key className="w-4 h-4" />
         </button>
+
+        {/* Quick Tool: License / Serial Management */}
+        {onOpenLicense && (
+          <button
+            onClick={onOpenLicense}
+            title={currentLicense ? `Licença Ativa: ${currentLicense.customerName}` : "Inserir Serial de Ativação"}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 border shadow-sm ${
+              currentLicense
+                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+            }`}
+          >
+            <ShieldCheck className={`w-3.5 h-3.5 ${currentLicense ? 'text-emerald-600' : 'text-amber-600'} stroke-[2.5]`} />
+            <span className="font-mono text-[11px] font-black">
+              {currentLicense?.isLifetime ? 'Vitalício' : currentLicense ? `${currentLicense.daysRemaining}d` : 'Serial'}
+            </span>
+          </button>
+        )}
 
         {/* Quick Tool: Open Render Folder in Explorer */}
         <button

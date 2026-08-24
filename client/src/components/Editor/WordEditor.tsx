@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Play,
   Trash2,
   Plus,
+  Minus,
+  RotateCcw,
   ChevronDown,
   ChevronRight,
   Type,
@@ -15,6 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 interface WordEditorProps {
   blocks: SubtitleBlock[];
+  originalBlocks?: SubtitleBlock[];
   style?: SubtitleStyle;
   currentTime: number;
   selectedBlockId: string | null;
@@ -29,6 +32,7 @@ interface WordEditorProps {
 
 export const WordEditor: React.FC<WordEditorProps> = ({
   blocks,
+  originalBlocks,
   style,
   currentTime,
   selectedBlockId,
@@ -41,9 +45,90 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   onSeek
 }) => {
   const [expandedBlocks, setExpandedBlocks] = useState<Record<string, boolean>>({});
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const toggleExpand = (id: string) => {
     setExpandedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Helper to reset a block's timing back to its original Whisper alignment
+  const handleResetBlockTiming = (block: SubtitleBlock) => {
+    const original = originalBlocks?.find(b => b.id === block.id);
+    if (!original) return;
+
+    onUpdateBlock(block.id, {
+      start: original.start,
+      end: original.end,
+      words: original.words && original.words.length > 0 ? original.words : block.words
+    });
+  };
+
+  // Helper to adjust block start time
+  const handleAdjustStartTime = (block: SubtitleBlock, delta: number, shiftEntireBlock = false) => {
+    if (shiftEntireBlock) {
+      const dur = block.end - block.start;
+      const newStart = Math.max(0, Math.round((block.start + delta) * 100) / 100);
+      const newEnd = Math.round((newStart + dur) * 100) / 100;
+      const actualDelta = newStart - block.start;
+
+      const updatedWords = (block.words || []).map(w => ({
+        ...w,
+        start: Math.max(0, Math.round((w.start + actualDelta) * 1000) / 1000),
+        end: Math.max(0.05, Math.round((w.end + actualDelta) * 1000) / 1000)
+      }));
+
+      onUpdateBlock(block.id, {
+        start: newStart,
+        end: newEnd,
+        words: updatedWords
+      });
+      return;
+    }
+
+    const minDuration = 0.2;
+    const newStart = Math.max(0, Math.min(block.end - minDuration, Math.round((block.start + delta) * 100) / 100));
+    if (newStart === block.start) return;
+
+    const newDuration = block.end - newStart;
+    const rawWords = block.words || [];
+    const wordDur = newDuration / Math.max(1, rawWords.length);
+
+    const updatedWords = rawWords.map((w, idx) => ({
+      ...w,
+      start: Math.round((newStart + idx * wordDur) * 1000) / 1000,
+      end: idx === rawWords.length - 1 ? block.end : Math.round((newStart + (idx + 1) * wordDur) * 1000) / 1000
+    }));
+
+    onUpdateBlock(block.id, {
+      start: newStart,
+      words: updatedWords
+    });
+  };
+
+  // Helper to adjust block end time
+  const handleAdjustEndTime = (block: SubtitleBlock, delta: number, shiftEntireBlock = false) => {
+    if (shiftEntireBlock) {
+      return handleAdjustStartTime(block, delta, true);
+    }
+
+    const minDuration = 0.2;
+    const newEnd = Math.max(block.start + minDuration, Math.round((block.end + delta) * 100) / 100);
+    if (newEnd === block.end) return;
+
+    const newDuration = newEnd - block.start;
+    const rawWords = block.words || [];
+    const wordDur = newDuration / Math.max(1, rawWords.length);
+
+    const updatedWords = rawWords.map((w, idx) => ({
+      ...w,
+      start: Math.round((block.start + idx * wordDur) * 1000) / 1000,
+      end: idx === rawWords.length - 1 ? newEnd : Math.round((block.start + (idx + 1) * wordDur) * 1000) / 1000
+    }));
+
+    onUpdateBlock(block.id, {
+      end: newEnd,
+      words: updatedWords
+    });
   };
 
   const handleToggleHideLine = (block: SubtitleBlock, lineNumber: 1 | 2) => {
@@ -127,6 +212,85 @@ export const WordEditor: React.FC<WordEditorProps> = ({
     });
   };
 
+  // Helper to update full 1-line block text
+  const handleUpdateFullBlockText = (block: SubtitleBlock, newText: string) => {
+    const rawWords = newText.trim().split(/\s+/).filter(Boolean);
+    const existingWords = block.words || [];
+    const duration = block.end - block.start;
+    const wordDur = Math.max(0.05, duration / Math.max(1, rawWords.length));
+
+    const updatedWords: SubtitleWord[] = rawWords.map((t, i) => {
+      const oldW = existingWords[i];
+      return {
+        id: oldW ? oldW.id : uuidv4(),
+        text: t,
+        start: oldW ? oldW.start : Math.round((block.start + i * wordDur) * 1000) / 1000,
+        end: oldW ? oldW.end : Math.round((block.start + (i + 1) * wordDur) * 1000) / 1000
+      };
+    });
+
+    onUpdateBlock(block.id, {
+      text: newText,
+      words: updatedWords
+    });
+  };
+
+  // Helper to transform text case (ABC, Abc, abc) - transforms selected text or whole line
+  const handleTransformCase = (
+    block: SubtitleBlock,
+    lineIndex: 1 | 2,
+    mode: 'upper' | 'title' | 'lower',
+    splitIndex: number,
+    isMultiline: boolean
+  ) => {
+    const inputKey = `${block.id}-${lineIndex}`;
+    const inputEl = inputRefs.current[inputKey];
+    const currentVal = !isMultiline || lineIndex === 1
+      ? (isMultiline ? block.words.slice(0, splitIndex).map(w => w.text).join(' ') : block.text)
+      : block.words.slice(splitIndex).map(w => w.text).join(' ');
+
+    const start = inputEl?.selectionStart ?? 0;
+    const end = inputEl?.selectionEnd ?? 0;
+
+    const transformStr = (s: string) => {
+      if (mode === 'upper') return s.toUpperCase();
+      if (mode === 'lower') return s.toLowerCase();
+      // Title case: Capitalize first letter of each word
+      return s.toLowerCase().replace(/(^|\s|\p{P})\p{L}/gu, (m) => m.toUpperCase());
+    };
+
+    let newText: string;
+    let newSelStart = start;
+    let newSelEnd = end;
+
+    if (start !== end && start >= 0 && end <= currentVal.length) {
+      const before = currentVal.substring(0, start);
+      const selected = currentVal.substring(start, end);
+      const after = currentVal.substring(end);
+      const transformedSelected = transformStr(selected);
+      newText = before + transformedSelected + after;
+      newSelStart = start;
+      newSelEnd = start + transformedSelected.length;
+    } else {
+      newText = transformStr(currentVal);
+    }
+
+    if (isMultiline) {
+      handleUpdateLineText(block, lineIndex, newText, splitIndex);
+    } else {
+      handleUpdateFullBlockText(block, newText);
+    }
+
+    if (inputEl) {
+      setTimeout(() => {
+        inputEl.focus();
+        if (start !== end) {
+          inputEl.setSelectionRange(newSelStart, newSelEnd);
+        }
+      }, 20);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3.5 overflow-y-auto max-h-[600px] p-1.5 select-none">
       {blocks.length === 0 ? (
@@ -141,6 +305,12 @@ export const WordEditor: React.FC<WordEditorProps> = ({
           const isSelected = selectedBlockId === block.id;
           const isExpanded = !!expandedBlocks[block.id];
 
+          const origBlock = originalBlocks?.find(b => b.id === block.id);
+          const isTimingModified = Boolean(
+            origBlock &&
+            (Math.abs(origBlock.start - block.start) > 0.01 || Math.abs(origBlock.end - block.end) > 0.01)
+          );
+
           // Compute 1-line vs 2-line layout
           const targetWordsPerLine = style?.wordsPerLine || 3;
           const isMultiline = (style?.maxLines === 2 && block.words.length > targetWordsPerLine) || (block.words.length >= 6);
@@ -150,7 +320,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
             if (block.words.length === 4 && targetWordsPerLine === 3) {
               splitIndex = 2;
             }
-            const punctIdx = block.words.findIndex((w, idx) => idx >= 0 && idx < block.words.length - 1 && /[,.?!…:;]$/.test(w.text.trim()));
+            const punctIdx = block.words.findIndex((w, i) => i >= 0 && i < block.words.length - 1 && /[,.?!…:;]$/.test(w.text.trim()));
             if (punctIdx !== -1 && punctIdx + 1 <= targetWordsPerLine) {
               splitIndex = punctIdx + 1;
             }
@@ -178,9 +348,10 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                   : 'bg-white hover:bg-neutral-100 border-2 border-neutral-300'
               }`}
             >
-              {/* Block Header */}
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              {/* Block Header with Timing Steppers */}
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                {/* Left Side: Start Time Stepper */}
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -192,28 +363,99 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                     {isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                   </button>
 
-                  <span className="text-xs font-mono font-black text-neutral-900 bg-neutral-100 px-2 py-0.5 rounded border border-neutral-300">
+                  <span className="text-xs font-mono font-black text-neutral-900 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-300">
                     #{idx + 1}
                   </span>
 
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSeek(block.start);
-                    }}
-                    title="Ouvir este trecho"
-                    className="flex items-center gap-1.5 text-xs font-mono text-neutral-900 font-black bg-neutral-100 hover:bg-neutral-200 px-2.5 py-0.5 rounded-lg border border-neutral-300 transition shadow-sm"
-                  >
-                    <Play className="w-3 h-3 fill-neutral-900" />
-                    <span>{formatTimecode(block.start)}</span>
-                  </button>
+                  {/* Start Stepper (- / Play / +) */}
+                  <div className="flex items-center bg-neutral-100 rounded-lg border border-neutral-300 p-0.5 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAdjustStartTime(block, -0.1, e.shiftKey);
+                      }}
+                      title="Adiantar início (-0.1s). Segure Shift para mover bloco todo."
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-black text-xs transition"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSeek(block.start);
+                      }}
+                      title="Ouvir este trecho"
+                      className="flex items-center gap-1 text-xs font-mono font-black px-1.5 py-0.5 rounded hover:bg-neutral-200 text-neutral-900 transition"
+                    >
+                      <Play className="w-2.5 h-2.5 fill-current" />
+                      <span>{formatTimecode(block.start)}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAdjustStartTime(block, 0.1, e.shiftKey);
+                      }}
+                      title="Atrasar início (+0.1s). Segure Shift para mover bloco todo."
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-black text-xs transition"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-neutral-600 font-mono font-bold">
-                    até {formatTimecode(block.end)}
-                  </span>
+                {/* Right Side: End Time Stepper, Restore & Delete */}
+                <div className="flex items-center gap-1.5">
+                  {/* Restore Original Timing Button (Shown when timing has been modified) */}
+                  {isTimingModified && origBlock && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleResetBlockTiming(block);
+                      }}
+                      title={`Restaurar tempo original (${formatTimecode(origBlock.start)} - ${formatTimecode(origBlock.end)})`}
+                      className="p-1 text-neutral-600 hover:text-black bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 rounded-lg border border-neutral-300 transition shadow-sm"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {/* End Stepper (- / até / +) */}
+                  <div className="flex items-center bg-neutral-100 rounded-lg border border-neutral-300 p-0.5 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAdjustEndTime(block, -0.1, e.shiftKey);
+                      }}
+                      title="Terminar antes (-0.1s). Segure Shift para mover bloco todo."
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-black text-xs transition"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+
+                    <span className="text-xs font-mono font-bold px-1.5 py-0.5 rounded text-neutral-700">
+                      até {formatTimecode(block.end)}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAdjustEndTime(block, 0.1, e.shiftKey);
+                      }}
+                      title="Terminar depois (+0.1s). Segure Shift para mover bloco todo."
+                      className="w-5 h-5 flex items-center justify-center rounded hover:bg-neutral-200 active:bg-neutral-300 text-neutral-800 font-black text-xs transition"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={(e) => {
@@ -237,6 +479,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                   </span>
 
                   <input
+                    ref={(el) => { inputRefs.current[`${block.id}-1`] = el; }}
                     type="text"
                     value={isMultiline ? line1Text : block.text}
                     onChange={(e) => {
@@ -253,6 +496,43 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                     }`}
                     placeholder="Texto da Linha 1..."
                   />
+
+                  {/* Botões de Caixa Alta/Baixa (ABC, Abc, abc) para Linha 1 */}
+                  <div className="flex items-center bg-neutral-100 p-0.5 rounded-xl border border-neutral-300 gap-0.5 shrink-0 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTransformCase(block, 1, 'upper', splitIndex, isMultiline);
+                      }}
+                      title="TUDO MAIÚSCULO (ABC) - Altera seleção ou linha toda"
+                      className="px-2 py-1 text-[11px] font-black rounded-lg text-neutral-800 hover:text-black hover:bg-neutral-200 active:scale-95 transition"
+                    >
+                      ABC
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTransformCase(block, 1, 'title', splitIndex, isMultiline);
+                      }}
+                      title="Primeira Letra Maiúscula (Abc) - Altera seleção ou linha toda"
+                      className="px-2 py-1 text-[11px] font-black rounded-lg text-neutral-800 hover:text-black hover:bg-neutral-200 active:scale-95 transition"
+                    >
+                      Abc
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTransformCase(block, 1, 'lower', splitIndex, isMultiline);
+                      }}
+                      title="tudo minúsculo (abc) - Altera seleção ou linha toda"
+                      className="px-2 py-1 text-[11px] font-black rounded-lg text-neutral-800 hover:text-black hover:bg-neutral-200 active:scale-95 transition"
+                    >
+                      abc
+                    </button>
+                  </div>
 
                   {/* Eye Toggle para Linha 1 */}
                   <button
@@ -280,6 +560,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                     </span>
 
                     <input
+                      ref={(el) => { inputRefs.current[`${block.id}-2`] = el; }}
                       type="text"
                       value={line2Text}
                       onChange={(e) => handleUpdateLineText(block, 2, e.target.value, splitIndex)}
@@ -290,6 +571,43 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                       }`}
                       placeholder="Texto da Linha 2..."
                     />
+
+                    {/* Botões de Caixa Alta/Baixa (ABC, Abc, abc) para Linha 2 */}
+                    <div className="flex items-center bg-neutral-100 p-0.5 rounded-xl border border-neutral-300 gap-0.5 shrink-0 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTransformCase(block, 2, 'upper', splitIndex, isMultiline);
+                        }}
+                        title="TUDO MAIÚSCULO (ABC) - Altera seleção ou linha toda"
+                        className="px-2 py-1 text-[11px] font-black rounded-lg text-neutral-800 hover:text-black hover:bg-neutral-200 active:scale-95 transition"
+                      >
+                        ABC
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTransformCase(block, 2, 'title', splitIndex, isMultiline);
+                        }}
+                        title="Primeira Letra Maiúscula (Abc) - Altera seleção ou linha toda"
+                        className="px-2 py-1 text-[11px] font-black rounded-lg text-neutral-800 hover:text-black hover:bg-neutral-200 active:scale-95 transition"
+                      >
+                        Abc
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTransformCase(block, 2, 'lower', splitIndex, isMultiline);
+                        }}
+                        title="tudo minúsculo (abc) - Altera seleção ou linha toda"
+                        className="px-2 py-1 text-[11px] font-black rounded-lg text-neutral-800 hover:text-black hover:bg-neutral-200 active:scale-95 transition"
+                      >
+                        abc
+                      </button>
+                    </div>
 
                     {/* Eye Toggle para Linha 2 */}
                     <button

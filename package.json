@@ -2,7 +2,7 @@
   "name": "legendas-animadas-studio",
   "version": "1.0.0",
   "description": "SaaS / Web App de Edição e Renderização de Legendas Animadas com FFmpeg, Whisper e ProRes 4444 Alpha",
-  "main": "server/dist/index.js",
+  "main": "electron/main.cjs",
   "scripts": {
     "install:all": "npm install && npm --prefix server install && npm --prefix client install",
     "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,magenta\" \"npm run dev:server\" \"npm run dev:client\"",
@@ -11,13 +11,50 @@
     "build": "npm run build:server && npm run build:client",
     "build:server": "cd server && npm run build",
     "build:client": "cd client && npm run build",
-    "start": "cd server && npm start"
+    "desktop": "electron .",
+    "build:portable": "npm run build && electron-builder --win portable",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
-  "keywords": ["subtitles", "karaoke", "ffmpeg", "whisper", "prores", "capcut", "opusclip"],
+  "build": {
+    "appId": "com.isosub.app",
+    "productName": "ISO SUB",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "server/dist/**/*",
+      "server/package.json",
+      "server/node_modules/**/*",
+      "client/dist/**/*",
+      "client/public/**/*"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "client/public/icon.ico"
+    },
+    "portable": {
+      "artifactName": "ISO-SUB-Portable.${ext}"
+    }
+  },
+  "keywords": [
+    "subtitles",
+    "karaoke",
+    "ffmpeg",
+    "whisper",
+    "prores",
+    "capcut",
+    "opusclip"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/cli": "^2.11.4",
     "concurrently": "^9.1.2",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
     "nodemon": "^3.1.9",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"

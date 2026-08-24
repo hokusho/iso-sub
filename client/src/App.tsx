@@ -25,6 +25,8 @@ import { WordEditor } from './components/Editor/WordEditor';
 import { ContinuousEditor } from './components/Editor/ContinuousEditor';
 import { SearchReplaceModal } from './components/Editor/SearchReplaceModal';
 import { ApiKeysModal } from './components/Settings/ApiKeysModal';
+import { LicenseModal } from './components/Settings/LicenseModal';
+import { getSavedLicense, validateSerialWithServer, ClientLicenseInfo } from './services/licenseClient';
 import { ExportModal } from './components/Export/ExportModal';
 import { ProcessingModal, ProcessStep } from './components/Common/ProcessingModal';
 import { ToastContainer, ToastMessage } from './components/Common/Toast';
@@ -93,6 +95,34 @@ export const App: React.FC = () => {
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [isApiKeysOpen, setIsApiKeysOpen] = useState<boolean>(false);
   const [isSearchReplaceOpen, setIsSearchReplaceOpen] = useState<boolean>(false);
+
+  // License / Serial State
+  const [currentLicense, setCurrentLicense] = useState<ClientLicenseInfo | null>(() => getSavedLicense());
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
+  const [isLicenseLocked, setIsLicenseLocked] = useState<boolean>(false);
+
+  // Validate license on mount
+  useEffect(() => {
+    const saved = getSavedLicense();
+    if (saved) {
+      setCurrentLicense(saved);
+      validateSerialWithServer(saved.serial).then((res) => {
+        if (!res.valid) {
+          setIsLicenseLocked(true);
+          setIsLicenseModalOpen(true);
+        } else if (res.customerName) {
+          setCurrentLicense({
+            serial: saved.serial,
+            customerName: res.customerName,
+            expiresAt: res.expiresAt ?? null,
+            isLifetime: res.isLifetime ?? false,
+            daysRemaining: res.daysRemaining ?? 9999,
+            lastValidatedAt: new Date().toISOString()
+          });
+        }
+      });
+    }
+  }, []);
 
   // Cache & Disk Space State
   const [cacheInfo, setCacheInfo] = useState<CacheInfo | null>(null);
@@ -839,6 +869,11 @@ export const App: React.FC = () => {
         onOpenExplorer={handleOpenExplorer}
         onOpenExport={() => setIsExportOpen(true)}
         onClearCache={handleClearCache}
+        currentLicense={currentLicense}
+        onOpenLicense={() => {
+          setIsLicenseLocked(false);
+          setIsLicenseModalOpen(true);
+        }}
       />
 
       {/* Main Workspace: Left Player + Right Styling/Editor Panels */}
@@ -1047,6 +1082,7 @@ export const App: React.FC = () => {
             {activeTab === 'words' && (
               <WordEditor
                 blocks={blocks}
+                originalBlocks={originalBlocks.length > 0 ? originalBlocks : blocks}
                 style={style}
                 currentTime={currentTime}
                 selectedBlockId={selectedBlockId}
@@ -1076,11 +1112,11 @@ export const App: React.FC = () => {
           </div>
 
           {/* Sidebar Logo Footer */}
-          <div className="py-4 px-6 border-t-2 border-slate-200 bg-white flex items-center justify-center shrink-0">
+          <div className="py-3.5 px-6 border-t border-neutral-300 bg-white flex items-center justify-center shrink-0">
             <img
               src={isoLogo}
-              alt="ISO"
-              className="h-16 w-auto object-contain transition transform hover:scale-105 duration-200"
+              alt="ISO Logo"
+              className="max-h-16 w-auto max-w-[220px] object-contain aspect-auto select-none transition-transform hover:scale-105"
             />
           </div>
         </div>
@@ -1098,6 +1134,19 @@ export const App: React.FC = () => {
       />
 
       <ApiKeysModal isOpen={isApiKeysOpen} onClose={() => setIsApiKeysOpen(false)} />
+
+      <LicenseModal
+        isOpen={isLicenseModalOpen}
+        isMandatoryLock={isLicenseLocked}
+        currentLicense={currentLicense}
+        onClose={() => setIsLicenseModalOpen(false)}
+        onLicenseUpdated={(lic) => {
+          setCurrentLicense(lic);
+          if (lic) {
+            setIsLicenseLocked(false);
+          }
+        }}
+      />
 
       <SearchReplaceModal
         isOpen={isSearchReplaceOpen}

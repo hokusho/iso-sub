@@ -93,8 +93,8 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
       ? activeBlock.words
       : [{ id: '1', text: activeBlock.text, start: activeBlock.start, end: activeBlock.end }];
 
-    // Scale font size proportionally to 1080x1920 Full HD Canvas space
-    const fontSize = (style.fontSize || 54) * 2;
+    // Exact font size chosen by user (e.g. 44px * 2 = 88px in Full HD 1080p canvas)
+    const fontSize = (style.fontSize || 44) * 2;
     const fontWeight = style.fontWeight || 800;
     const fontFamily = style.fontFamily || 'Montserrat';
 
@@ -136,17 +136,14 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     }));
 
     // Determine 1-line vs 2-line layout:
-    // Only wrap to 2 lines if total words strictly EXCEED wordsPerLine (e.g. 4+ words for 3 words/line)
     const targetWordsPerLine = style.wordsPerLine || 3;
     const isMultiline = (style.maxLines === 2 && words.length > targetWordsPerLine) || (words.length >= 6);
-    
+
     let splitIndex = targetWordsPerLine;
     if (isMultiline && wordMeasures.length > targetWordsPerLine) {
-      // Balance 4 words into 2 + 2 for visual harmony
       if (wordMeasures.length === 4 && targetWordsPerLine === 3) {
         splitIndex = 2;
       }
-      // Smart punctuation break for multiline: break right after punctuation mark if within line 1
       const punctIdx = wordMeasures.findIndex((w, idx) => idx >= 0 && idx < wordMeasures.length - 1 && /[,.?!…:;]$/.test(w.text.trim()));
       if (punctIdx !== -1 && punctIdx + 1 <= targetWordsPerLine) {
         splitIndex = punctIdx + 1;
@@ -188,6 +185,11 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     const hasShadow = ((style.shadowDistance ?? 0) > 0) || ((style.shadowBlur ?? 0) > 0);
     const hasStroke = (style.strokeWidth ?? 0) > 0;
 
+    // Ensure context font matches the exact calculated font size
+    ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
     // Helper to render a single line of words
     const renderWordLine = (lineWords: typeof wordMeasures, lineTotalWidth: number, targetY: number) => {
       let currentX = posX - lineTotalWidth / 2;
@@ -197,6 +199,9 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
         const isWordActive = w.isActive;
 
         ctx.save();
+        ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}", -apple-system, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.translate(wordCenterX, targetY);
 
         // Handle Pop / Bounce animation scale
@@ -233,7 +238,8 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
           ctx.shadowColor = 'transparent';
           ctx.shadowBlur = 0;
           ctx.strokeStyle = style.strokeColor || '#000000';
-          ctx.lineWidth = (style.strokeWidth || 8) * 2.8;
+          const baseFontPx = (style.fontSize || 54) * 2;
+          ctx.lineWidth = (style.strokeWidth || 8) * 2.8 * (fontSize / baseFontPx);
           ctx.lineJoin = 'round';
           ctx.miterLimit = 2;
           ctx.strokeText(w.display, 0, 0);

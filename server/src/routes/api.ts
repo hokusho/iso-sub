@@ -24,6 +24,7 @@ import {
   buildSrtSubtitle,
   buildVttSubtitle
 } from '../services/assBuilder';
+import { validateLicense, loadLicenses, saveLicenses } from '../services/licenseService';
 import { SubtitleBlock, SubtitleStyle, RenderJobProgress, VideoMetadata } from '../types';
 
 const router = express.Router();
@@ -643,6 +644,52 @@ router.post('/translate', async (req: Request, res: Response): Promise<void> => 
   } catch (err: any) {
     console.error('Translation route error:', err);
     res.status(500).json({ error: err.message || 'Failed to translate subtitles' });
+  }
+});
+
+/**
+ * POST /api/license/validate
+ * Validates serial key and binds deviceId
+ */
+router.post('/license/validate', (req: Request, res: Response): void => {
+  try {
+    const { serial, deviceId } = req.body;
+    const result = validateLicense(serial, deviceId);
+    res.json(result);
+  } catch (err: any) {
+    console.error('License validation error:', err);
+    res.status(500).json({ valid: false, message: 'Erro ao validar licença no servidor.' });
+  }
+});
+
+/**
+ * GET /api/license/list
+ * Retrieves licenses list for local admin panel sync
+ */
+router.get('/license/list', (req: Request, res: Response): void => {
+  try {
+    const licenses = loadLicenses();
+    res.json({ success: true, licenses });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/license/save
+ * Saves licenses list from local admin panel
+ */
+router.post('/license/save', (req: Request, res: Response): void => {
+  try {
+    const { licenses } = req.body;
+    if (!Array.isArray(licenses)) {
+      res.status(400).json({ success: false, error: 'Expected licenses array' });
+      return;
+    }
+    saveLicenses(licenses);
+    res.json({ success: true, count: licenses.length });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

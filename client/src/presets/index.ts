@@ -3,7 +3,7 @@ import { Preset, SubtitleStyle } from '../types';
 export const DEFAULT_STYLE: SubtitleStyle = {
   presetName: 'Hormozi Viral',
   fontFamily: 'Montserrat',
-  fontSize: 54,
+  fontSize: 44,
   lineHeight: 1.2,
   letterSpacing: 1,
   caseTransform: 'uppercase',
@@ -24,12 +24,12 @@ export const DEFAULT_STYLE: SubtitleStyle = {
   positionY: 74, // 74% from top (optimal 9:16 safe zone)
   positionX: 50,
   alignment: 'center',
-  maxWidthPercent: 85,
+  maxWidthPercent: 70,
   animationType: 'pop',
   animationScale: 1.2,
   animationDurationMs: 120,
   wordsPerLine: 3,
-  maxLines: 2,
+  maxLines: 1,
 };
 
 export const PRESETS: Preset[] = [

@@ -239,12 +239,28 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
         {/* Tamanho da Fonte */}
         <div className="flex flex-col gap-1 bg-neutral-100 p-2.5 rounded-xl border-2 border-neutral-300">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-neutral-900">Tamanho</span>
-            <span className="text-xs font-mono font-black text-neutral-900">{style.fontSize}px</span>
+            <span className="text-xs font-black text-neutral-900">Tamanho da Fonte</span>
+            <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-lg border border-neutral-300 shadow-sm">
+              <button
+                type="button"
+                onClick={() => onChange({ fontSize: Math.max(10, (style.fontSize || 44) - 2) })}
+                className="w-4 h-4 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-xs"
+              >
+                −
+              </button>
+              <span className="text-xs font-mono font-black text-neutral-900 px-1">{style.fontSize}px</span>
+              <button
+                type="button"
+                onClick={() => onChange({ fontSize: Math.min(96, (style.fontSize || 44) + 2) })}
+                className="w-4 h-4 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-xs"
+              >
+                +
+              </button>
+            </div>
           </div>
           <input
             type="range"
-            min="5"
+            min="10"
             max="96"
             step="1"
             value={style.fontSize}
@@ -311,7 +327,44 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
 
       {/* 3. CORES COM DROP 6X6, CONTA-GOTAS, RGB E HEX */}
       <div className="grid grid-cols-2 gap-3 pt-2 border-t-2 border-neutral-200">
-        {/* Coluna 1: Palavra Destaque (Ativa) */}
+        {/* Coluna 1: Texto Padrão (Base) */}
+        <div className="flex flex-col gap-2.5 bg-neutral-100 p-3 rounded-xl border-2 border-neutral-300">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Type className="w-4 h-4 text-neutral-900" />
+              <span className="text-xs font-black text-neutral-900">Texto Base</span>
+            </div>
+            <span className="text-[11px] font-mono font-black text-neutral-900 bg-white px-2 py-0.5 rounded border border-neutral-300">
+              {style.textColor?.toUpperCase() || '#FFFFFF'}
+            </span>
+          </div>
+
+          {/* Custom Popover Picker com Grade 6x6 + Conta-gotas + RGB + HEX */}
+          <ColorPickerPopover
+            color={style.textColor || '#FFFFFF'}
+            label="Texto Base"
+            onChange={(c) => onChange({ textColor: c })}
+          />
+
+          {/* Mini Swatches de Atalho */}
+          <div className="grid grid-cols-6 gap-1 mt-0.5">
+            {quickTextSwatches.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onChange({ textColor: c })}
+                style={{ backgroundColor: c }}
+                className={`h-5 rounded-md border transition ${
+                  style.textColor?.toLowerCase() === c.toLowerCase()
+                    ? 'border-neutral-950 ring-2 ring-neutral-950 scale-110'
+                    : 'border-neutral-400 hover:scale-105'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Coluna 2: Palavra Destaque (Ativa) */}
         <div className={`flex flex-col gap-2.5 p-3 rounded-xl border-2 transition ${
           style.useHighlight !== false
             ? 'bg-neutral-100 border-neutral-300'
@@ -374,43 +427,6 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
               </span>
             </div>
           )}
-        </div>
-
-        {/* Coluna 2: Texto Padrão (Base) */}
-        <div className="flex flex-col gap-2.5 bg-neutral-100 p-3 rounded-xl border-2 border-neutral-300">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Type className="w-4 h-4 text-neutral-900" />
-              <span className="text-xs font-black text-neutral-900">Texto Base</span>
-            </div>
-            <span className="text-[11px] font-mono font-black text-neutral-900 bg-white px-2 py-0.5 rounded border border-neutral-300">
-              {style.textColor?.toUpperCase() || '#FFFFFF'}
-            </span>
-          </div>
-
-          {/* Custom Popover Picker com Grade 6x6 + Conta-gotas + RGB + HEX */}
-          <ColorPickerPopover
-            color={style.textColor || '#FFFFFF'}
-            label="Texto Base"
-            onChange={(c) => onChange({ textColor: c })}
-          />
-
-          {/* Mini Swatches de Atalho */}
-          <div className="grid grid-cols-6 gap-1 mt-0.5">
-            {quickTextSwatches.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => onChange({ textColor: c })}
-                style={{ backgroundColor: c }}
-                className={`h-5 rounded-md border transition ${
-                  style.textColor?.toLowerCase() === c.toLowerCase()
-                    ? 'border-neutral-950 ring-2 ring-neutral-950 scale-110'
-                    : 'border-neutral-400 hover:scale-105'
-                }`}
-              />
-            ))}
-          </div>
         </div>
       </div>
     </div>

@@ -81,11 +81,15 @@ export const SubtitleTrack: React.FC<SubtitleTrackProps> = ({
 
   return (
     <div className="relative h-14 w-full">
-      {blocks.map((block) => {
+      {blocks.map((block, idx) => {
         const left = timeToPx(block.start);
         const width = Math.max(24, timeToPx(block.end) - left);
         const isActive = currentTime >= block.start && currentTime <= block.end;
         const isSelected = selectedBlockId === block.id;
+
+        const prevBlock = idx > 0 ? blocks[idx - 1] : null;
+        const nextBlock = idx < blocks.length - 1 ? blocks[idx + 1] : null;
+        const isOverlapping = Boolean((nextBlock && block.end > nextBlock.start + 0.02) || (prevBlock && block.start < prevBlock.end - 0.02));
 
         return (
           <div

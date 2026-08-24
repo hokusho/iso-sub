@@ -3,11 +3,17 @@ node_modules/
 */node_modules/
 package-lock.json.backup
 
-# Production builds
+# Production builds & Executables
 dist/
 */dist/
 build/
 */build/
+release/
+dist-electron/
+src-tauri/target/
+*.exe
+*.msi
+*.dmg
 .vite/
 
 # Temporary and upload storage (keeps project ultra-lightweight)
@@ -46,3 +52,10 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Private Admin License Dashboard & Keys (Never commit to Git)
+admin-license/
+admin/
+license-server/
+licenses.json
+server/storage/licenses.json

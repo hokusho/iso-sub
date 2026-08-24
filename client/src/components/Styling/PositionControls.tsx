@@ -206,34 +206,16 @@ export const PositionControls: React.FC<PositionControlsProps> = ({
             className="w-full h-2.5 bg-neutral-300 rounded-lg accent-neutral-900 cursor-pointer"
           />
 
-          {/* Quick X buttons */}
-          <div className="grid grid-cols-6 gap-1">
-            <button
-              type="button"
-              onClick={() => onChange({ positionX: 30 })}
-              className={`col-span-2 py-1 text-[10px] font-black rounded-lg border transition truncate ${
-                currentX <= 35 ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-800 border-neutral-300'
-              }`}
-            >
-              ⬅️ 30%
-            </button>
+          {/* Quick X button: Centro */}
+          <div className="flex justify-center">
             <button
               type="button"
               onClick={() => onChange({ positionX: 50 })}
-              className={`col-span-2 py-1 text-[10px] font-black rounded-lg border transition truncate ${
-                currentX >= 45 && currentX <= 55 ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-800 border-neutral-300'
+              className={`px-3 py-1 text-[10px] font-black rounded-lg border transition shadow-sm ${
+                currentX >= 48 && currentX <= 52 ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-800 border-neutral-300 hover:bg-neutral-200'
               }`}
             >
-              ⭐ Centro
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange({ positionX: 70 })}
-              className={`col-span-2 py-1 text-[10px] font-black rounded-lg border transition truncate ${
-                currentX >= 65 ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-800 border-neutral-300'
-              }`}
-            >
-              ➡️ 70%
+              Centro
             </button>
           </div>
         </div>
@@ -274,7 +256,7 @@ export const PositionControls: React.FC<PositionControlsProps> = ({
                   : 'text-neutral-700 hover:bg-neutral-100'
               }`}
             >
-              2 Linhas (Tempo Somado)
+              2 Linhas
             </button>
           </div>
         </div>

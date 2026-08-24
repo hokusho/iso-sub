@@ -39,34 +39,41 @@ O navegador abrirá automaticamente em:
 
 ---
 
-## 🔑 Como Obter as Chaves de API (Transcrição Automática Whisper)
+## 🔑 Como Obter a Chave de IA Gratuita (Transcrição Whisper na Groq)
 
-O aplicativo utiliza modelos Whisper de IA para transcrever o áudio do vídeo palavra por palavra em segundos. Suas chaves de API ficam salvas **apenas no armazenamento privado do seu navegador (localStorage)** e nunca são enviadas ou salvas no repositório.
+O aplicativo utiliza o modelo de inteligência artificial **Whisper Large v3** através da **Groq Cloud** para transcrever vídeos palavra por palavra em menos de 2 segundos.
 
-### Opção 1: Groq Cloud (Recomendada — 100% Gratuita & Ultrarrápida ⚡)
-A API da Groq transcreve vídeos de 1 minuto em menos de 2 segundos com o modelo `whisper-large-v3-turbo` sem custo:
+Sua chave de API fica salva **apenas no armazenamento privado do seu computador local (localStorage)** e nunca é enviada para servidores de terceiros ou compartilhada.
+
+---
+
+### 📊 Limites Oficiais do Plano Gratuito da Groq *(Atualizado em: 21 de Agosto de 2026)*:
+
+| Especificação | Limite Oficial Gratuito |
+| :--- | :--- |
+| **Custo** | **100% Gratuito** (Sem cartão de crédito) |
+| **Limite por Hora** | **2 Horas de áudio por hora** (7.200 segundos/hora) |
+| **Limite por Minuto** | **20 requisições por minuto** (RPM) |
+| **Capacidade Diária Estimada** | **+150 vídeos curtos (Reels/TikTok)** ou **+30 vídeos longos (YouTube)** |
+| **Velocidade Média** | **~1.5 segundo** para transcrever 1 minuto de fala |
+| **Modelo Utilizado** | `whisper-large-v3` / `whisper-large-v3-turbo` com timestamps de palavras |
+
+---
+
+### 🚀 Como Criar Sua Chave Gratuita em 30 Segundos:
 1. Acesse o console da Groq: **[console.groq.com](https://console.groq.com)**
-2. Crie uma conta gratuita (com Google ou GitHub).
+2. Crie ou acesse sua conta gratuitamente usando seu login do Google ou GitHub.
 3. No menu lateral esquerdo, clique em **API Keys**.
 4. Clique no botão **`+ Create API Key`**.
 5. Dê um nome (ex: `ISO-SUB`) e copie a chave gerada (começa com `gsk_...`).
 
 ---
 
-### Opção 2: OpenAI Whisper (Opcional)
-Se preferir utilizar a API oficial da OpenAI:
-1. Acesse: **[platform.openai.com/api-keys](https://platform.openai.com/api-keys)**
-2. Crie sua conta ou faça login.
-3. Clique em **`Create new secret key`**.
-4. Copie a chave gerada (começa com `sk-...`).
-
----
-
-### 📌 Onde Inserir a Chave no Aplicativo:
-1. Abra o **ISO SUB** no seu navegador.
-2. No menu superior (Navbar), clique no ícone de chave / configurações (**`🔑 API Keys`**).
-3. Cole a sua chave da **Groq** ou da **OpenAI** no campo correspondente e clique em **`Salvar Chaves`**.
-4. Pronto! O botão **`Gerar Legendas`** agora transcreverá qualquer vídeo instantaneamente.
+### 📌 Como Inserir no Aplicativo:
+1. Abra o **ISO SUB** (Web ou Executável Desktop).
+2. No menu superior, clique no ícone de raio/chave (**`⚡ IA Whisper`**).
+3. Cole a sua chave da **Groq** (`gsk_...`) e clique em **`Salvar Chave`**.
+4. Pronto! A chave fica salva para sempre no seu computador e você pode transcrever ilimitadamente.
 
 ---
 
