@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, ShieldCheck, ExternalLink, Download, Key, Info, Trash2, Lock } from 'lucide-react';
+import { apiEndpoint } from '../../utils/api';
 
 interface ApiKeysModalProps {
   isOpen: boolean;
@@ -29,6 +30,12 @@ export const ApiKeysModal: React.FC<ApiKeysModalProps> = ({ isOpen, onClose, onS
       return;
     }
     localStorage.setItem('GROQ_API_KEY', trimmed);
+    fetch(apiEndpoint('/api/user-settings'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: { groqKey: trimmed } })
+    }).catch(() => {});
+
     setHasStoredKey(true);
     setSavedSuccess(true);
     if (onSaved) onSaved();
@@ -43,6 +50,12 @@ export const ApiKeysModal: React.FC<ApiKeysModalProps> = ({ isOpen, onClose, onS
     
     if (window.confirm('Tem certeza que deseja remover a chave de IA deste computador? O aplicativo será bloqueado até que uma nova chave seja inserida.')) {
       localStorage.removeItem('GROQ_API_KEY');
+      fetch(apiEndpoint('/api/user-settings'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: { groqKey: '' } })
+      }).catch(() => {});
+
       setGroqKey('');
       setHasStoredKey(false);
       setRemoveSuccess(true);

@@ -37,12 +37,24 @@ export function getSavedLicense(): ClientLicenseInfo | null {
   }
 }
 
+import { apiEndpoint } from '../utils/api';
+
 export function saveLicenseLocally(info: ClientLicenseInfo): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(info));
+  fetch(apiEndpoint('/api/user-settings'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings: { license: info, deviceId: getOrCreateDeviceId() } })
+  }).catch(() => {});
 }
 
 export function clearSavedLicense(): void {
   localStorage.removeItem(STORAGE_KEY);
+  fetch(apiEndpoint('/api/user-settings'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings: { license: null } })
+  }).catch(() => {});
 }
 
 export interface LicenseValidationResponse {

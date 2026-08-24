@@ -114,18 +114,29 @@ export const App: React.FC = () => {
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
   const [isLicenseLocked, setIsLicenseLocked] = useState<boolean>(false);
 
-  // Check if an OTA update was previously applied and load dynamic updated version
+  // Sync persistent local settings (Groq key, License, HWID) from disk
   useEffect(() => {
-    const isTauriDefault = window.location.protocol === 'tauri:' || window.location.hostname === 'tauri.localhost';
-    if (isTauriDefault && localStorage.getItem('isosub_has_updated') === 'true') {
-      fetch('http://127.0.0.1:4000/health')
-        .then(r => {
-          if (r.ok) {
-            window.location.replace(`http://127.0.0.1:4000?v=${Date.now()}`);
+    const syncSettings = async () => {
+      try {
+        const res = await fetch(apiEndpoint('/api/user-settings'));
+        if (res.ok) {
+          const { settings } = await res.json();
+          if (settings) {
+            if (settings.groqKey && !localStorage.getItem('GROQ_API_KEY')) {
+              localStorage.setItem('GROQ_API_KEY', settings.groqKey);
+            }
+            if (settings.license && !localStorage.getItem('isosub_license_data')) {
+              localStorage.setItem('isosub_license_data', JSON.stringify(settings.license));
+              setCurrentLicense(settings.license);
+            }
+            if (settings.deviceId && !localStorage.getItem('isosub_device_hwid')) {
+              localStorage.setItem('isosub_device_hwid', settings.deviceId);
+            }
           }
-        })
-        .catch(() => {});
-    }
+        }
+      } catch {}
+    };
+    syncSettings();
   }, []);
 
   // Check for updates on startup (Hot-Update OTA)

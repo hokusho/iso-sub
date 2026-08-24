@@ -96,20 +96,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="font-semibold text-neutral-600">SUB</span>
               </h1>
             </div>
-
-            {/* Live Visual Status Badge */}
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border ${
-              statusBadge.type === 'loading'
-                ? 'bg-amber-50 border-amber-200 text-amber-900 animate-pulse'
-                : statusBadge.type === 'success'
-                ? 'bg-neutral-200 border-neutral-300 text-neutral-900'
-                : 'bg-neutral-100 border-neutral-300 text-neutral-700'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${
-                statusBadge.type === 'loading' ? 'bg-amber-500' : statusBadge.type === 'success' ? 'bg-emerald-600' : 'bg-neutral-400'
-              }`} />
-              <span>{statusBadge.label}</span>
-            </div>
           </div>
           {fileName && (
             <div className="flex items-center gap-1 text-xs text-neutral-600 font-mono font-medium truncate max-w-sm mt-1">

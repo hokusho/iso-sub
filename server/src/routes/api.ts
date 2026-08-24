@@ -694,6 +694,48 @@ router.post('/license/save', (req: Request, res: Response): void => {
 });
 
 /**
+ * GET /api/user-settings
+ * Returns stored user settings (license info, Groq API key, etc.)
+ */
+router.get('/user-settings', (req: Request, res: Response): void => {
+  try {
+    const settingsFile = path.resolve(STORAGE_DIR, 'user_settings.json');
+    if (fs.existsSync(settingsFile)) {
+      const data = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+      res.json({ success: true, settings: data });
+      return;
+    }
+    res.json({ success: true, settings: {} });
+  } catch (err: any) {
+    res.json({ success: false, error: err.message, settings: {} });
+  }
+});
+
+/**
+ * POST /api/user-settings
+ * Persists user settings to disk
+ */
+router.post('/user-settings', (req: Request, res: Response): void => {
+  try {
+    const { settings } = req.body;
+    if (!settings || typeof settings !== 'object') {
+      res.status(400).json({ success: false, message: 'Invalid settings object' });
+      return;
+    }
+    const settingsFile = path.resolve(STORAGE_DIR, 'user_settings.json');
+    let existing: any = {};
+    if (fs.existsSync(settingsFile)) {
+      try { existing = JSON.parse(fs.readFileSync(settingsFile, 'utf-8')); } catch {}
+    }
+    const merged = { ...existing, ...settings, updatedAt: new Date().toISOString() };
+    fs.writeFileSync(settingsFile, JSON.stringify(merged, null, 2), 'utf-8');
+    res.json({ success: true, settings: merged });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
  * POST /api/updates/apply
  * Downloads and extracts an OTA bundle into client/dist directory
  */

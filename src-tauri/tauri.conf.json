@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "ISO SUB",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "identifier": "com.isosub.studio",
   "build": {
     "frontendDist": "../client/dist",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "ISO SUB v1.1.6 | Editor e Renderizador de Legendas",
+        "title": "ISO SUB v1.1.7 | Editor e Renderizador de Legendas",
         "width": 1400,
         "height": 900,
         "minWidth": 1080,
