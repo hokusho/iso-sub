@@ -10,10 +10,12 @@ import {
   Video,
   Layers,
   Wand2,
-  FolderOpen
+  FolderOpen,
+  MousePointerClick
 } from 'lucide-react';
 import { Navbar, CacheInfo } from './components/Navbar';
 import isoLogo from './assets/iso3.png';
+import pixQrCode from './assets/pix_qrcode.png';
 import { CanvasPreview } from './components/VideoPlayer/CanvasPreview';
 import { VideoControls } from './components/VideoPlayer/VideoControls';
 import { Timeline } from './components/Timeline/Timeline';
@@ -26,6 +28,7 @@ import { ContinuousEditor } from './components/Editor/ContinuousEditor';
 import { SearchReplaceModal } from './components/Editor/SearchReplaceModal';
 import { ApiKeysModal } from './components/Settings/ApiKeysModal';
 import { LicenseModal } from './components/Settings/LicenseModal';
+import { PixModal } from './components/Common/PixModal';
 import { getSavedLicense, validateLicenseOnline, clearSavedLicense, ClientLicenseInfo } from './services/licenseClient';
 import { ExportModal } from './components/Export/ExportModal';
 import { ProcessingModal, ProcessStep } from './components/Common/ProcessingModal';
@@ -95,6 +98,7 @@ export const App: React.FC = () => {
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [isApiKeysOpen, setIsApiKeysOpen] = useState<boolean>(false);
   const [isSearchReplaceOpen, setIsSearchReplaceOpen] = useState<boolean>(false);
+  const [isPixModalOpen, setIsPixModalOpen] = useState<boolean>(false);
 
   // License / Serial State
   const [currentLicense, setCurrentLicense] = useState<ClientLicenseInfo | null>(() => getSavedLicense());
@@ -1127,18 +1131,60 @@ export const App: React.FC = () => {
             )}
           </div>
 
-          {/* Sidebar Logo Footer */}
-          <div className="py-3.5 px-6 border-t border-neutral-300 bg-white flex items-center justify-center shrink-0">
-            <img
-              src={isoLogo}
-              alt="ISO Logo"
-              className="max-h-16 w-auto max-w-[220px] object-contain aspect-auto select-none transition-transform hover:scale-105"
-            />
+          {/* Sidebar Footer: Logo, PIX Support & Centered Creator Credit */}
+          <div className="p-3 border-t border-neutral-300 bg-white flex flex-col gap-2 shrink-0 select-none">
+            <div className="flex items-center justify-between gap-3">
+              {/* Left: ISO Veneno Logo with Link (Larger and Left-aligned) */}
+              <a
+                href="https://instagram.com/isoveneno"
+                target="_blank"
+                rel="noreferrer"
+                title="Instagram @isoveneno"
+                className="group flex items-center justify-start transition-transform hover:scale-105"
+              >
+                <img
+                  src={isoLogo}
+                  alt="ISO Veneno Logo"
+                  className="h-12 max-h-14 w-auto max-w-[180px] object-contain object-left select-none"
+                />
+              </a>
+
+              {/* Right: PIX Modal Trigger Button */}
+              <button
+                type="button"
+                onClick={() => setIsPixModalOpen(true)}
+                title="Clique para apoiar o projeto com um PIX"
+                className="flex items-center gap-2 px-3 py-2 bg-neutral-50 hover:bg-emerald-50/80 border border-neutral-200 hover:border-emerald-400 rounded-2xl transition active:scale-95 shadow-xs group cursor-pointer text-left shrink-0"
+              >
+                <div className="w-7 h-7 rounded-xl bg-white border border-neutral-200 flex items-center justify-center text-emerald-700 group-hover:scale-110 transition shrink-0 shadow-xs">
+                  <MousePointerClick className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                </div>
+                <span className="text-[11px] font-black text-neutral-800 group-hover:text-emerald-800 transition">
+                  apoie o projeto :)
+                </span>
+              </button>
+            </div>
+
+            {/* Bottom Left-aligned: Small Creator Credit */}
+            <p className="text-[10px] text-neutral-400 font-medium text-left tracking-tight border-t border-neutral-100 pt-1.5">
+              Criado por{' '}
+              <a
+                href="https://instagram.com/hokusho"
+                target="_blank"
+                rel="noreferrer"
+                title="Instagram @hokusho"
+                className="font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition"
+              >
+                @hokusho
+              </a>
+            </p>
           </div>
         </div>
       </div>
 
       {/* Global Modals */}
+      <PixModal isOpen={isPixModalOpen} onClose={() => setIsPixModalOpen(false)} />
+
       <ExportModal
         isOpen={isExportOpen}
         fileId={fileId || ''}

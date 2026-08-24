@@ -21,8 +21,9 @@
         "fullscreen": false
       }
     ],
+    "withGlobalTauri": false,
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:* http://127.0.0.1:* https://trrewoowgbhyfceumrlt.supabase.co https://api.groq.com; img-src 'self' data: blob: https:; media-src 'self' blob: data: http://localhost:* http://127.0.0.1:*;"
     }
   },
   "bundle": {
