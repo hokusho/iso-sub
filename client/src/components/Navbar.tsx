@@ -14,6 +14,8 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
+import { ClientLicenseInfo } from '../services/licenseClient';
+
 export interface CacheInfo {
   tempBytes: number;
   tempCount: number;
@@ -38,7 +40,7 @@ interface NavbarProps {
   onOpenExplorer: () => void;
   onOpenExport: () => void;
   onClearCache: () => void;
-  currentLicense?: any;
+  currentLicense?: ClientLicenseInfo | null;
   onOpenLicense?: () => void;
 }
 

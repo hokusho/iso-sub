@@ -1,105 +1,119 @@
-# 🎬 ISO SUB - Estúdio de Legendas Animadas & Virais
+# ISO SUB — Estúdio Profissional de Legendas Animadas & Virais
 
-> Aplicação Web Completa (Frontend React/Vite + Backend Node.js/FFmpeg/Whisper) para criação, customização e renderização profissional de legendas dinâmicas estilo Hormozi, MrBeast e Submagic.
+> **Aplicação Desktop & Web de Alta Performance** para criação, customização, transcrição com IA e renderização profissional de legendas animadas nos estilos mais virais da internet (**Hormozi, MrBeast, Submagic, TikTok e Reels**).
 
 ---
 
-## ⚡ Como rodar em qualquer computador (Novo Clone)
+## Quickstart (Como Rodar no seu Computador)
 
 ### 1. Pré-requisitos
-- **Node.js** (versão 18 ou superior) instalado: [nodejs.org](https://nodejs.org)
-- **Git** instalado: [git-scm.com](https://git-scm.com)
+- **Node.js** (v18 ou superior): [nodejs.org](https://nodejs.org)
+- **Git**: [git-scm.com](https://git-scm.com)
+- **FFmpeg**: Já incluso e empacotado na estrutura de binários nativos.
 
 ---
 
-### 2. Instalação Rápida (1 Comando)
+### 2. Instalação Completa (1 Único Comando)
 Abra o terminal na pasta do projeto e execute:
 ```bash
 npm run install:all
 ```
-*Isso instalará automaticamente todas as dependências da raiz, do servidor e do cliente frontend.*
+*Isso instala automaticamente todas as dependências da raiz, do servidor backend e do cliente web/desktop.*
 
 ---
 
-### 3. Iniciar o Projeto
-Para rodar tanto o servidor quanto o frontend juntos:
+### 3. Iniciar o Projeto em Desenvolvimento
 
 **Opção A (Via Terminal):**
 ```bash
 npm run dev
 ```
 
-**Opção B (No Windows):**
-Basta dar **duplo clique** no arquivo:
+**Opção B (No Windows com 1 Clique):**
+Basta dar duplo clique no arquivo:
 - `INICIAR_APP.bat`
 
 O navegador abrirá automaticamente em:
-- **Frontend**: [http://localhost:5173](http://localhost:5173) ou [http://localhost:5174](http://localhost:5174)
-- **Backend API**: [http://localhost:5000](http://localhost:5000)
+- **Frontend Studio**: [http://localhost:5173](http://localhost:5173)
+- **Backend API**: [http://localhost:4000](http://localhost:4000)
 
 ---
 
-## 🔑 Como Obter a Chave de IA Gratuita (Transcrição Whisper na Groq)
+## Principais Recursos & Tecnologias
 
-O aplicativo utiliza o modelo de inteligência artificial **Whisper Large v3** através da **Groq Cloud** para transcrever vídeos palavra por palavra em menos de 2 segundos.
+### Inteligência Artificial & Transcrição
+- **Groq Cloud Whisper Large v3**: Transcrição palavra por palavra em menos de **1.5 segundo**.
+- **Timestamps Precisos**: Sincronização milimétrica de palavras com waveform de áudio.
+- **Divisão Inteligente**: Algoritmo de agrupamento e quebra de blocos em 1 e 2 linhas.
 
-Sua chave de API fica salva **apenas no armazenamento privado do seu computador local (localStorage)** e nunca é enviada para servidores de terceiros ou compartilhada.
+### Personalização Visual & Animações
+- **Presets Virais de 1 Clique**: Hormozi Viral, MrBeast Impact, Submagic Roxo, Cyber Ciano, TikTok Minimal e Karaokê.
+- **Tipografia & Cores**: Seletor 6x6 com 36 cores vibrantes, destaque de palavra ativa e controle de tamanho com steppers.
+- **Efeitos Dinâmicos**: Pop Zoom suave, Bounce, Glow Neon, Contorno e Sombras 3D.
+- **Social Safe Zones**: Guias proporcionais para Reels do Instagram, TikTok e Shorts do YouTube.
 
----
+### Renderização & Exportação
+- **Exportação Full HD (MP4 H.264)** com legendas queimadas (*hardcoded*).
+- **ProRes 4444 com Canal Alfa**: Exportação transparente para edição no Premiere, Final Cut e DaVinci Resolve.
+- **Exportação de Legendas**: Download em `.SRT`, `.VTT` e `.JSON`.
 
-### 📊 Limites Oficiais do Plano Gratuito da Groq *(Atualizado em: 21 de Agosto de 2026)*:
-
-| Especificação | Limite Oficial Gratuito |
-| :--- | :--- |
-| **Custo** | **100% Gratuito** (Sem cartão de crédito) |
-| **Limite por Hora** | **2 Horas de áudio por hora** (7.200 segundos/hora) |
-| **Limite por Minuto** | **20 requisições por minuto** (RPM) |
-| **Capacidade Diária Estimada** | **+150 vídeos curtos (Reels/TikTok)** ou **+30 vídeos longos (YouTube)** |
-| **Velocidade Média** | **~1.5 segundo** para transcrever 1 minuto de fala |
-| **Modelo Utilizado** | `whisper-large-v3` / `whisper-large-v3-turbo` com timestamps de palavras |
-
----
-
-### 🚀 Como Criar Sua Chave Gratuita em 30 Segundos:
-1. Acesse o console da Groq: **[console.groq.com](https://console.groq.com)**
-2. Crie ou acesse sua conta gratuitamente usando seu login do Google ou GitHub.
-3. No menu lateral esquerdo, clique em **API Keys**.
-4. Clique no botão **`+ Create API Key`**.
-5. Dê um nome (ex: `ISO-SUB`) e copie a chave gerada (começa com `gsk_...`).
+### Proteção, Licenciamento & Segurança
+- **Painel Administrativo Privado**: Gestão em tempo real de clientes, seriais e expirações.
+- **Autenticação em Nuvem (Supabase)**: Validação instantânea de Nome de Usuário + Chave de Serial.
+- **Segurança em Múltiplas Camadas (Tauri v2)**: Bloqueio de DevTools, CSP Restritiva, Proteção de Build e Zero Polling.
 
 ---
 
-### 📌 Como Inserir no Aplicativo:
-1. Abra o **ISO SUB** (Web ou Executável Desktop).
-2. No menu superior, clique no ícone de raio/chave (**`⚡ IA Whisper`**).
-3. Cole a sua chave da **Groq** (`gsk_...`) e clique em **`Salvar Chave`**.
-4. Pronto! A chave fica salva para sempre no seu computador e você pode transcrever ilimitadamente.
+## Configuração da Chave Gratuita da IA (Groq Whisper)
+
+1. Acesse o console gratuito da Groq: **[console.groq.com/keys](https://console.groq.com/keys)**
+2. Faça login com o Google ou GitHub.
+3. Clique em **`+ Create API Key`** e copie a sua chave (`gsk_...`).
+4. No topo do aplicativo **ISO SUB**, clique no ícone de chave (**`Chave API`**) e salve.
 
 ---
 
-## 🚀 Principais Recursos
-- 🚀 **Animações Dinâmicas**: Pop com Zoom suave, Bounce, Só Cor e Karaoke progressivo.
-- 🎨 **Seletor de Cores 6x6**: 36 cores virais/Flat UI com conta-gotas na tela, valores RGB e HEX em tempo real.
-- 📐 **Modos de 1 e 2 Linhas**: Quebra inteligente com base em pontuação e capacidade de palavras.
-- 👁️ **Controle de Linhas (Ocultar/Exibir)**: Botão de olho tipo senha para ocultar qualquer linha do vídeo final.
-- 📱 **Social Safe Zones**: Guias proporcionais de Reels do Instagram e TikTok.
-- ⚡ **Auto-Transcode para Web**: Suporte nativo para vídeos `.MOV`, `HEVC (iPhone)`, `MP4`, `MKV`, etc.
-- 💾 **Exportação Full HD e ProRes 4444 com Canal Alfa Transparente**.
+## Arquitetura do Repositório
 
----
-
-## 📁 Estrutura do Projeto
 ```text
 LEGENDAS/
-├── client/              # Interface Web (React 19, Vite, TailwindCSS, Lucide)
-│   ├── src/             # Componentes, Players, Hooks e Estilos
+├── client/              # Frontend React 19 + TypeScript + Vite + TailwindCSS
+│   ├── src/
+│   │   ├── assets/      # Logos, Ícones e QR Codes
+│   │   ├── components/  # Timeline, Canvas Player, Editores e Modais
+│   │   ├── presets/     # Biblioteca de Estilos de Legendas
+│   │   ├── services/    # Conexão de Licença e API Client
+│   │   └── types/       # Definições TypeScript
 │   └── package.json
-├── server/              # Backend (Express, FFmpeg, Whisper, ASS Builder)
-│   ├── src/             # Rotas, Serviços e Tipos
-│   ├── storage/         # Armazenamento seguro de uploads e renders
-│   └── package.json
-├── .gitignore           # Ignora uploads pesados e arquivos temporários
-├── INICIAR_APP.bat      # Script de inicialização rápida (Windows)
-├── package.json         # Scripts unificados
-└── README.md
+├── server/              # Backend Node.js + Express + FFmpeg + Whisper
+│   ├── src/
+│   │   ├── routes/      # Rotas de Upload, Transcrição, Cache e Render
+│   │   ├── services/    # ASS Builder, Processador FFmpeg e Gerenciador de Licenças
+│   │   └── index.ts     # Servidor Express com suporte a streaming
+│   └── storage/         # Armazenamento temporário seguro (.gitignore)
+├── src-tauri/           # Aplicativo Desktop Nativo (Tauri v2 + Rust)
+│   ├── src/             # Inicialização segura e gerenciamento de processos
+│   ├── capabilities/    # Permissões mínimas restritas
+│   └── tauri.conf.json  # Configuração de CSP e empacotamento
+├── INICIAR_APP.bat      # Launcher rápido para Windows
+└── package.json         # Scripts unificados de desenvolvimento e build
 ```
+
+---
+
+## Créditos & Apoio
+
+Criado por **[@hokusho](https://instagram.com/hokusho)** | **ISO VENENO** **[@isoveneno](https://instagram.com/isoveneno)**
+
+---
+
+## Agradecimentos Especiais
+
+- **Claudio Felis** (code)
+- **Francisco Junior** (code)
+- **Thiago Dantas** (code)
+- **Giullia Siqueira** (design e usabilidade)
+
+---
+
+> *Gostou do projeto? Considere apoiar o desenvolvedor com uma doação via PIX no aplicativo.*

@@ -135,6 +135,11 @@ export const App: React.FC = () => {
             daysRemaining: res.daysRemaining ?? 9999,
             lastValidatedAt: new Date().toISOString()
           });
+
+          // Se a licença estiver ativa mas não houver chave Groq, induz o usuário a configurar
+          if (!localStorage.getItem('GROQ_API_KEY')) {
+            setIsApiKeysOpen(true);
+          }
         }
       } catch (err) {
         console.warn('License verification error on startup:', err);
@@ -1206,6 +1211,9 @@ export const App: React.FC = () => {
           setCurrentLicense(lic);
           if (lic) {
             setIsLicenseLocked(false);
+            if (!localStorage.getItem('GROQ_API_KEY')) {
+              setIsApiKeysOpen(true);
+            }
           }
         }}
       />

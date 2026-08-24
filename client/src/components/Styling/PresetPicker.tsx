@@ -78,16 +78,11 @@ export const PresetPicker: React.FC<PresetPickerProps> = ({
                   : 'bg-white hover:bg-neutral-50 border-2 border-neutral-300 text-neutral-900'
               }`}
             >
-              {/* Top Row: Title, Badge and Check Indicator */}
+              {/* Top Row: Title and Check Indicator */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-base font-black tracking-tight text-neutral-900">
                     {preset.name}
-                  </span>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                    isSelected ? 'bg-neutral-900 text-white' : 'bg-neutral-200 text-neutral-800'
-                  }`}>
-                    {preset.previewBadge}
                   </span>
                 </div>
 
