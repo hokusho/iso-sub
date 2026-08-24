@@ -26,7 +26,7 @@ import { ContinuousEditor } from './components/Editor/ContinuousEditor';
 import { SearchReplaceModal } from './components/Editor/SearchReplaceModal';
 import { ApiKeysModal } from './components/Settings/ApiKeysModal';
 import { LicenseModal } from './components/Settings/LicenseModal';
-import { getSavedLicense, validateSerialWithServer, ClientLicenseInfo } from './services/licenseClient';
+import { getSavedLicense, validateLicenseOnline, clearSavedLicense, ClientLicenseInfo } from './services/licenseClient';
 import { ExportModal } from './components/Export/ExportModal';
 import { ProcessingModal, ProcessStep } from './components/Common/ProcessingModal';
 import { ToastContainer, ToastMessage } from './components/Common/Toast';
@@ -101,16 +101,28 @@ export const App: React.FC = () => {
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
   const [isLicenseLocked, setIsLicenseLocked] = useState<boolean>(false);
 
-  // Validate license on mount
+  // Validate license ONLY once on startup (Strict Mandatory Gate, zero background polling)
   useEffect(() => {
-    const saved = getSavedLicense();
-    if (saved) {
-      setCurrentLicense(saved);
-      validateSerialWithServer(saved.serial).then((res) => {
+    const checkLicenseStatus = async () => {
+      const saved = getSavedLicense();
+      if (!saved) {
+        setCurrentLicense(null);
+        setIsLicenseLocked(true);
+        setIsLicenseModalOpen(true);
+        return;
+      }
+
+      try {
+        const res = await validateLicenseOnline(saved.customerName, saved.serial);
         if (!res.valid) {
+          // Blocked or expired -> wipe cache and lock immediately
+          clearSavedLicense();
+          setCurrentLicense(null);
           setIsLicenseLocked(true);
           setIsLicenseModalOpen(true);
         } else if (res.customerName) {
+          setIsLicenseLocked(false);
+          setIsLicenseModalOpen(false); // Modal remains closed when license is valid
           setCurrentLicense({
             serial: saved.serial,
             customerName: res.customerName,
@@ -120,8 +132,12 @@ export const App: React.FC = () => {
             lastValidatedAt: new Date().toISOString()
           });
         }
-      });
-    }
+      } catch (err) {
+        console.warn('License verification error on startup:', err);
+      }
+    };
+
+    checkLicenseStatus();
   }, []);
 
   // Cache & Disk Space State

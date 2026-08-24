@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { KeyRound, ShieldCheck, AlertCircle, CheckCircle2, Copy, Sparkles, ExternalLink, Laptop, RefreshCw } from 'lucide-react';
-import { ClientLicenseInfo, validateSerialWithServer, clearSavedLicense } from '../../services/licenseClient';
+import React, { useState, useEffect } from 'react';
+import { KeyRound, ShieldCheck, AlertCircle, CheckCircle2, Copy, X, User, RefreshCw } from 'lucide-react';
+import { ClientLicenseInfo, validateLicenseOnline, deactivateLicenseOnline } from '../../services/licenseClient';
 
 interface LicenseModalProps {
   isOpen: boolean;
@@ -17,16 +17,45 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
   currentLicense,
   onLicenseUpdated
 }) => {
-  const [serialInput, setSerialInput] = useState('');
+  const [nameInput, setNameInput] = useState(currentLicense?.customerName || '');
+  const [serialInput, setSerialInput] = useState(currentLicense?.serial || '');
   const [isLoading, setIsLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isEditingKey, setIsEditingKey] = useState(!currentLicense);
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
+
+  useEffect(() => {
+    if (!currentLicense) {
+      setIsEditingKey(true);
+      if (isMandatoryLock) {
+        setErrorMsg('Esta licença está bloqueada ou inativa. Insira uma nova chave.');
+      }
+    } else {
+      setIsEditingKey(false);
+      setNameInput(currentLicense.customerName);
+      setSerialInput(currentLicense.serial);
+      setErrorMsg(null);
+    }
+  }, [currentLicense, isMandatoryLock]);
+
+  const effectiveLock = isMandatoryLock || !currentLicense;
 
   if (!isOpen) return null;
 
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!nameInput.trim()) {
+      setErrorMsg('Por favor, informe o seu nome de usuário cadastrado.');
+      return;
+    }
     if (!serialInput.trim()) {
       setErrorMsg('Por favor, insira a sua chave de serial.');
       return;
@@ -37,7 +66,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
     setSuccessMsg(null);
 
     try {
-      const res = await validateSerialWithServer(serialInput.trim());
+      const res = await validateLicenseOnline(nameInput.trim(), serialInput.trim());
 
       if (res.valid && res.customerName) {
         const updatedLic: ClientLicenseInfo = {
@@ -52,27 +81,32 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
         onLicenseUpdated(updatedLic);
         setIsEditingKey(false);
         setTimeout(() => {
-          if (isMandatoryLock) {
-            onClose();
-          }
-        }, 1200);
+          onClose();
+        }, 1000);
       } else {
-        setErrorMsg(res.message || 'Serial inválido ou expirado.');
+        setErrorMsg(res.message || 'Nome ou Serial inválido.');
+        setCooldown(3);
       }
     } catch {
-      setErrorMsg('Erro de conexão ao verificar serial. Tente novamente.');
+      setErrorMsg('Erro de conexão ao verificar serial com o Supabase. Tente novamente.');
+      setCooldown(3);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleDeactivate = () => {
-    if (confirm('Tem certeza que deseja desativar a licença deste computador?')) {
-      clearSavedLicense();
+  const handleDeactivate = async () => {
+    if (confirm('Tem certeza que deseja desativar e desvincular a licença deste computador? O aplicativo será bloqueado imediatamente.')) {
+      setIsLoading(true);
+      if (currentLicense?.serial) {
+        await deactivateLicenseOnline(currentLicense.serial);
+      }
       onLicenseUpdated(null);
       setIsEditingKey(true);
+      setNameInput('');
       setSerialInput('');
-      setSuccessMsg('Licença desvinculada deste computador.');
+      setSuccessMsg('Licença desvinculada. Insira um novo serial para desbloquear o app.');
+      setIsLoading(false);
     }
   };
 
@@ -81,39 +115,37 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
     : 'Vitalício (Sem Expiração)';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 text-left relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-md animate-in fade-in duration-200 select-none">
+      <div className="bg-white border-2 border-neutral-300 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 text-left relative">
         
-        {/* Glow de Fundo */}
-        <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
-
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b border-neutral-200 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-slate-950 font-black">
-              <KeyRound className="w-5 h-5 stroke-[2.5]" />
+            <div className="w-10 h-10 rounded-2xl bg-neutral-950 text-white flex items-center justify-center shadow-sm">
+              <KeyRound className="w-5 h-5 text-amber-400 stroke-[2.5]" />
             </div>
             <div>
-              <h3 className="font-display font-black text-base text-white tracking-wide flex items-center gap-2">
-                Ativação & Licença
+              <h3 className="font-black text-neutral-900 text-base flex items-center gap-2">
+                Ativação do ISO SUB
                 {currentLicense && (
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-black">
                     Ativo
                   </span>
                 )}
               </h3>
-              <p className="text-[11px] text-slate-400 font-medium">
-                {isMandatoryLock ? 'Insira seu Serial para desbloquear o ISO SUB' : 'Gerenciamento da sua licença'}
+              <p className="text-xs text-neutral-500 font-bold">
+                {isMandatoryLock ? 'Insira seu Usuário e Serial para liberar o uso' : 'Gerenciamento da sua licença ativa'}
               </p>
             </div>
           </div>
 
-          {!isMandatoryLock && (
+          {!effectiveLock && (
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition text-xs font-bold"
+              className="p-1.5 rounded-xl text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition"
+              title="Fechar"
             >
-              ✕
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -122,28 +154,28 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
         {currentLicense && !isEditingKey ? (
           <div className="space-y-4">
             
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-850 pb-2">
-                <span className="text-[11px] font-bold text-slate-400">Titular da Licença</span>
-                <span className="text-xs font-black text-white">{currentLicense.customerName}</span>
+            <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-300 space-y-3">
+              <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                <span className="text-xs font-bold text-neutral-600">Usuário / Titular</span>
+                <span className="text-xs font-black text-neutral-950">{currentLicense.customerName}</span>
               </div>
 
-              <div className="flex items-center justify-between border-b border-slate-850 pb-2">
-                <span className="text-[11px] font-bold text-slate-400">Validade</span>
-                <span className="text-xs font-mono font-bold text-emerald-400">
+              <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                <span className="text-xs font-bold text-neutral-600">Validade</span>
+                <span className="text-xs font-mono font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                   {currentLicense.isLifetime ? '⭐ Vitalício' : `${expDateFormatted} (${currentLicense.daysRemaining} dias)`}
                 </span>
               </div>
 
               <div className="space-y-1">
-                <span className="text-[10px] uppercase font-bold text-slate-500">Chave de Serial</span>
-                <div className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800">
-                  <span className="font-mono text-xs text-emerald-400 font-bold tracking-wider">
+                <span className="text-[10px] uppercase font-bold text-neutral-500">Chave de Serial</span>
+                <div className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-neutral-300">
+                  <span className="font-mono text-xs text-neutral-900 font-black tracking-wider">
                     {currentLicense.serial}
                   </span>
                   <button
                     onClick={() => navigator.clipboard.writeText(currentLicense.serial)}
-                    className="text-slate-400 hover:text-white p-1"
+                    className="text-neutral-500 hover:text-neutral-900 p-1"
                     title="Copiar Serial"
                   >
                     <Copy className="w-3.5 h-3.5" />
@@ -156,7 +188,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
               <button
                 type="button"
                 onClick={handleDeactivate}
-                className="text-xs font-bold text-rose-400 hover:text-rose-300 py-2 px-3 rounded-xl hover:bg-rose-500/10 transition"
+                className="text-xs font-bold text-rose-600 hover:text-rose-700 py-2 px-3 rounded-xl hover:bg-rose-50 transition border border-transparent hover:border-rose-200"
               >
                 Desativar neste PC
               </button>
@@ -164,7 +196,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-display font-black text-xs px-5 py-2.5 rounded-xl transition shadow-md shadow-emerald-500/20"
+                className="bg-neutral-950 hover:bg-black text-white font-black text-xs px-6 py-2.5 rounded-xl transition active:scale-95 shadow-sm"
               >
                 Concluir
               </button>
@@ -172,55 +204,73 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
 
           </div>
         ) : (
-          /* MODO 2: FORMULÁRIO DE INSERÇÃO DE SERIAL */
+          /* MODO 2: FORMULÁRIO DE INSERÇÃO DE NOME + SERIAL */
           <form onSubmit={handleActivate} className="space-y-4">
             
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                Chave de Serial (Licença) *
+            {/* Input Nome de Usuário */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black text-neutral-800 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-neutral-600" />
+                <span>Nome de Usuário / Titular *</span>
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  value={serialInput}
-                  onChange={(e) => setSerialInput(e.target.value.toUpperCase())}
-                  placeholder="ISOSUB-XXXX-XXXX-XXXX"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-4 py-3 text-xs font-mono font-bold text-emerald-400 placeholder-slate-600 focus:outline-none transition tracking-widest uppercase"
-                />
-              </div>
-              <p className="text-[10px] text-slate-500 mt-1">
-                Digite ou cole o serial exatamente como você recebeu.
+              <input
+                type="text"
+                required
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="Ex: hokusho"
+                className="w-full bg-neutral-100 border border-neutral-300 focus:border-neutral-900 rounded-xl px-3.5 py-2.5 text-xs font-bold text-neutral-900 placeholder-neutral-400 focus:outline-none transition"
+              />
+              <p className="text-[10px] text-neutral-500 font-medium">
+                Nome exatamente como cadastrado pelo administrador.
               </p>
             </div>
 
+            {/* Input Chave de Serial */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-black text-neutral-800 flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-neutral-600" />
+                <span>Chave de Serial *</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={serialInput}
+                onChange={(e) => setSerialInput(e.target.value.toUpperCase())}
+                placeholder="ISOSUB-XXXX-XXXX-XXXX"
+                className="w-full bg-neutral-100 border border-neutral-300 focus:border-neutral-900 rounded-xl px-3.5 py-2.5 text-xs font-mono font-black text-neutral-900 placeholder-neutral-400 focus:outline-none transition tracking-wider uppercase"
+              />
+            </div>
+
             {errorMsg && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-start gap-2.5 text-xs text-rose-400 animate-in fade-in">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-                <span className="font-semibold">{errorMsg}</span>
+              <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-2.5 text-xs text-rose-700 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                <span className="font-bold">{errorMsg}</span>
               </div>
             )}
 
             {successMsg && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-start gap-2.5 text-xs text-emerald-400 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
-                <span className="font-semibold">{successMsg}</span>
+              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex items-start gap-2.5 text-xs text-emerald-800 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                <span className="font-bold">{successMsg}</span>
               </div>
             )}
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-display font-black text-xs py-3 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+              disabled={isLoading || cooldown > 0}
+              className="w-full py-3 rounded-2xl bg-neutral-950 hover:bg-black text-white text-xs font-black transition active:scale-95 shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>VERIFICANDO SERIAL...</span>
+                  <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                  <span>VERIFICANDO NO SUPABASE...</span>
                 </>
+              ) : cooldown > 0 ? (
+                <span className="text-amber-300 font-mono font-bold">AGUARDE {cooldown}S...</span>
               ) : (
                 <>
-                  <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
                   <span>ATIVAR APLICATIVO AGORA</span>
                 </>
               )}
@@ -230,7 +280,7 @@ export const LicenseModal: React.FC<LicenseModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsEditingKey(false)}
-                className="w-full py-1.5 text-xs font-bold text-slate-400 hover:text-white transition"
+                className="w-full py-1 text-xs font-bold text-neutral-500 hover:text-neutral-900 transition"
               >
                 Voltar aos dados da licença ativa
               </button>
