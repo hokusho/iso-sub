@@ -53,9 +53,13 @@ desktop.ini
 *.swp
 *.swo
 
+# Architecture & AI Agent Specs (Never commit to Git)
+architecture-docs/
+
 # Private Admin License Dashboard & Keys (Never commit to Git)
 admin-license/
 admin/
 license-server/
 licenses.json
 server/storage/licenses.json
+

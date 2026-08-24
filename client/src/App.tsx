@@ -138,6 +138,21 @@ export const App: React.FC = () => {
     };
     syncSettings();
   }, []);
+  // Synchronize Window Title with the current active version dynamically
+  useEffect(() => {
+    const ver = getActiveAppVersion();
+    const titleText = `ISO SUB v${ver} | Editor e Renderizador de Legendas`;
+    document.title = titleText;
+
+    // Direct Tauri v2 Window Title API bridge
+    try {
+      if ((window as any).__TAURI_INTERNALS__) {
+        (window as any).__TAURI_INTERNALS__.invoke('plugin:window|set_title', {
+          title: titleText
+        }).catch(() => {});
+      }
+    } catch {}
+  }, []);
 
   // Check for updates on startup (Hot-Update OTA)
   useEffect(() => {
