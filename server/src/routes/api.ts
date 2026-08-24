@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
-import { UPLOAD_DIR, RENDERS_DIR, TEMP_DIR } from '../config';
+import { UPLOAD_DIR, RENDERS_DIR, TEMP_DIR, STORAGE_DIR } from '../config';
 import {
   probeVideo,
   extractAudioToWav,
@@ -705,7 +705,13 @@ router.post('/updates/apply', async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const distDir = path.resolve(__dirname, '../../../client/dist');
+    const distTargets = [
+      path.resolve(STORAGE_DIR, 'dist'),
+      path.resolve(__dirname, '../../client/dist'),
+      path.resolve(__dirname, '../../../client/dist'),
+      path.resolve(process.cwd(), 'client/dist')
+    ];
+
     const tempZipPath = path.resolve(TEMP_DIR, `update-${Date.now()}.zip`);
 
     // Download the zip archive
@@ -718,20 +724,18 @@ router.post('/updates/apply', async (req: Request, res: Response): Promise<void>
     const buffer = Buffer.from(await response.arrayBuffer());
     fs.writeFileSync(tempZipPath, buffer);
 
-    // Extract using Windows native tar / PowerShell
+    // Extract to all targets
     const { exec } = await import('child_process');
-    await new Promise<void>((resolve, reject) => {
-      exec(`tar -xf "${tempZipPath}" -C "${distDir}"`, (error) => {
-        if (error) {
-          exec(`powershell -Command "Expand-Archive -Path '${tempZipPath}' -DestinationPath '${distDir}' -Force"`, (psError) => {
-            if (psError) reject(psError);
-            else resolve();
+    for (const target of distTargets) {
+      try {
+        fs.mkdirSync(target, { recursive: true });
+        await new Promise<void>((resolve) => {
+          exec(`powershell -Command "Expand-Archive -Path '${tempZipPath}' -DestinationPath '${target}' -Force"`, () => {
+            resolve();
           });
-        } else {
-          resolve();
-        }
-      });
-    });
+        });
+      } catch {}
+    }
 
     // Cleanup temp zip
     try { fs.unlinkSync(tempZipPath); } catch {}

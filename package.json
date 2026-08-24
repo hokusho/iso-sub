@@ -1,6 +1,6 @@
 {
   "name": "legendas-animadas-studio",
-  "version": "1.1.5",
+  "version": "1.1.6b",
   "description": "SaaS / Web App de Edição e Renderização de Legendas Animadas com FFmpeg, Whisper e ProRes 4444 Alpha",
   "main": "electron/main.cjs",
   "scripts": {

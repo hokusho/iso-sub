@@ -31,7 +31,7 @@ import { ApiKeysModal } from './components/Settings/ApiKeysModal';
 import { LicenseModal } from './components/Settings/LicenseModal';
 import { PixModal } from './components/Common/PixModal';
 import { UpdateModal } from './components/Common/UpdateModal';
-import { AppUpdateInfo, checkForAppUpdates } from './services/updateService';
+import { AppUpdateInfo, checkForAppUpdates, CURRENT_APP_VERSION, getActiveAppVersion } from './services/updateService';
 import { getSavedLicense, validateLicenseOnline, clearSavedLicense, ClientLicenseInfo } from './services/licenseClient';
 import { ExportModal } from './components/Export/ExportModal';
 import { ProcessingModal, ProcessStep } from './components/Common/ProcessingModal';
@@ -113,6 +113,20 @@ export const App: React.FC = () => {
   const [currentLicense, setCurrentLicense] = useState<ClientLicenseInfo | null>(() => getSavedLicense());
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
   const [isLicenseLocked, setIsLicenseLocked] = useState<boolean>(false);
+
+  // Check if an OTA update was previously applied and load dynamic updated version
+  useEffect(() => {
+    const isTauriDefault = window.location.protocol === 'tauri:' || window.location.hostname === 'tauri.localhost';
+    if (isTauriDefault && localStorage.getItem('isosub_has_updated') === 'true') {
+      fetch('http://127.0.0.1:4000/health')
+        .then(r => {
+          if (r.ok) {
+            window.location.replace(`http://127.0.0.1:4000?v=${Date.now()}`);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Check for updates on startup (Hot-Update OTA)
   useEffect(() => {
@@ -1253,12 +1267,12 @@ export const App: React.FC = () => {
                       title={`Nova versão ${updateInfo.latestVersion} disponível! Clique para atualizar.`}
                       className="text-[9.5px] font-mono font-black text-red-600 hover:text-red-700 underline underline-offset-2 animate-pulse cursor-pointer transition flex items-center gap-1"
                     >
-                      <span>v1.1.5 (v{updateInfo.latestVersion} disponível)</span>
+                      <span>v{getActiveAppVersion()} (v{updateInfo.latestVersion} disponível)</span>
                     </button>
                   </>
                 ) : (
                   <span className="text-[9.5px] font-mono font-bold text-neutral-400">
-                    v1.1.5
+                    v{getActiveAppVersion()}
                   </span>
                 )}
               </div>

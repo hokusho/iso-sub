@@ -28,6 +28,7 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, updateInfo, on
     try {
       const res = await applyAppUpdate(updateInfo.bundleUrl);
       if (res.success) {
+        localStorage.setItem('isosub_installed_version', updateInfo.latestVersion);
         setUpdateSuccess(true);
         setTimeout(() => {
           window.location.reload();

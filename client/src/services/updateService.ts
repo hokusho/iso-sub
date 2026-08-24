@@ -2,7 +2,7 @@
  * ISO SUB — Hot-Update / OTA Service (Atualizações sem reinstalar)
  */
 
-export const CURRENT_APP_VERSION = '1.1.5';
+export const CURRENT_APP_VERSION = '1.1.6b';
 
 const SUPABASE_URL = 'https://trrewoowgbhyfceumrlt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRycmV3b293Z2JoeWZjZXVtcmx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1ODEyODAsImV4cCI6MjEwMzE1NzI4MH0.f_qkTF1PHgvmQMr12XgectaWCD1PquY6GSZItLM8IlE';
@@ -36,10 +36,21 @@ function isVersionHigher(remote: string, current: string): boolean {
   }
 }
 
+export function getActiveAppVersion(): string {
+  try {
+    const installed = localStorage.getItem('isosub_installed_version');
+    if (installed && isVersionHigher(installed, CURRENT_APP_VERSION)) {
+      return installed;
+    }
+  } catch {}
+  return CURRENT_APP_VERSION;
+}
+
 /**
  * Verifica se há uma atualização disponível no Supabase
  */
 export async function checkForAppUpdates(): Promise<AppUpdateInfo | null> {
+  const currentVersion = getActiveAppVersion();
   try {
     // 1. Tenta buscar da tabela app_updates no Supabase
     const res = await fetch(`${SUPABASE_URL}/rest/v1/app_updates?select=*&order=created_at.desc&limit=1`, {
@@ -56,11 +67,11 @@ export async function checkForAppUpdates(): Promise<AppUpdateInfo | null> {
       if (Array.isArray(data) && data.length > 0) {
         const update = data[0];
         const remoteVersion = update.version || update.latest_version;
-        if (remoteVersion && isVersionHigher(remoteVersion, CURRENT_APP_VERSION)) {
+        if (remoteVersion && isVersionHigher(remoteVersion, currentVersion)) {
           return {
             hasUpdate: true,
             latestVersion: remoteVersion,
-            currentVersion: CURRENT_APP_VERSION,
+            currentVersion: currentVersion,
             releaseNotes: update.notes || update.release_notes || 'Novas melhorias e correções de desempenho.',
             bundleUrl: update.bundle_url || update.download_url,
             mandatory: Boolean(update.mandatory)
@@ -70,8 +81,8 @@ export async function checkForAppUpdates(): Promise<AppUpdateInfo | null> {
     }
     return {
       hasUpdate: false,
-      latestVersion: CURRENT_APP_VERSION,
-      currentVersion: CURRENT_APP_VERSION
+      latestVersion: currentVersion,
+      currentVersion: currentVersion
     };
   } catch (err) {
     console.warn('Erro ao checar atualizações:', err);

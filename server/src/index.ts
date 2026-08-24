@@ -42,20 +42,38 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Serve frontend client/dist if built (for desktop/production single-port access)
-const CLIENT_DIST = path.resolve(__dirname, '../../client/dist');
-if (fs.existsSync(CLIENT_DIST)) {
-  app.use(express.static(CLIENT_DIST));
-  app.use((req, res, next) => {
-    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/storage')) {
-      const indexFile = path.resolve(CLIENT_DIST, 'index.html');
-      if (fs.existsSync(indexFile)) {
-        return res.sendFile(indexFile);
-      }
+// Serve frontend client/dist if built (for desktop/production dynamic hot updates)
+const getClientDistDir = (): string => {
+  const customDist = path.resolve(STORAGE_DIR, 'dist');
+  if (fs.existsSync(path.resolve(customDist, 'index.html'))) {
+    return customDist;
+  }
+  const defaultDist = path.resolve(__dirname, '../../client/dist');
+  if (fs.existsSync(path.resolve(defaultDist, 'index.html'))) {
+    return defaultDist;
+  }
+  return customDist;
+};
+
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
+app.use(express.static(getClientDistDir()));
+
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.startsWith('/storage')) {
+    const distDir = getClientDistDir();
+    const indexFile = path.resolve(distDir, 'index.html');
+    if (fs.existsSync(indexFile)) {
+      return res.sendFile(indexFile);
     }
-    next();
-  });
-}
+  }
+  next();
+});
 
 app.listen(PORT, HOST, () => {
   console.log(`🚀 Animated Subtitles Server running on http://${HOST}:${PORT}`);
