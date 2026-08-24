@@ -693,4 +693,54 @@ router.post('/license/save', (req: Request, res: Response): void => {
   }
 });
 
+/**
+ * POST /api/updates/apply
+ * Downloads and extracts an OTA bundle into client/dist directory
+ */
+router.post('/updates/apply', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { bundleUrl } = req.body;
+    if (!bundleUrl || typeof bundleUrl !== 'string') {
+      res.status(400).json({ success: false, message: 'URL do pacote inválida.' });
+      return;
+    }
+
+    const distDir = path.resolve(__dirname, '../../../client/dist');
+    const tempZipPath = path.resolve(TEMP_DIR, `update-${Date.now()}.zip`);
+
+    // Download the zip archive
+    const response = await fetch(bundleUrl);
+    if (!response.ok) {
+      res.status(400).json({ success: false, message: `Falha ao baixar pacote: ${response.statusText}` });
+      return;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(tempZipPath, buffer);
+
+    // Extract using Windows native tar / PowerShell
+    const { exec } = await import('child_process');
+    await new Promise<void>((resolve, reject) => {
+      exec(`tar -xf "${tempZipPath}" -C "${distDir}"`, (error) => {
+        if (error) {
+          exec(`powershell -Command "Expand-Archive -Path '${tempZipPath}' -DestinationPath '${distDir}' -Force"`, (psError) => {
+            if (psError) reject(psError);
+            else resolve();
+          });
+        } else {
+          resolve();
+        }
+      });
+    });
+
+    // Cleanup temp zip
+    try { fs.unlinkSync(tempZipPath); } catch {}
+
+    res.json({ success: true, message: 'Atualização aplicada com sucesso!' });
+  } catch (err: any) {
+    console.error('Update apply error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Erro ao aplicar atualização.' });
+  }
+});
+
 export default router;

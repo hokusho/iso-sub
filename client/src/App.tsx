@@ -29,6 +29,8 @@ import { SearchReplaceModal } from './components/Editor/SearchReplaceModal';
 import { ApiKeysModal } from './components/Settings/ApiKeysModal';
 import { LicenseModal } from './components/Settings/LicenseModal';
 import { PixModal } from './components/Common/PixModal';
+import { UpdateModal } from './components/Common/UpdateModal';
+import { AppUpdateInfo, checkForAppUpdates } from './services/updateService';
 import { getSavedLicense, validateLicenseOnline, clearSavedLicense, ClientLicenseInfo } from './services/licenseClient';
 import { ExportModal } from './components/Export/ExportModal';
 import { ProcessingModal, ProcessStep } from './components/Common/ProcessingModal';
@@ -100,10 +102,28 @@ export const App: React.FC = () => {
   const [isSearchReplaceOpen, setIsSearchReplaceOpen] = useState<boolean>(false);
   const [isPixModalOpen, setIsPixModalOpen] = useState<boolean>(false);
 
+  // Hot-Update / OTA State
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
+
   // License / Serial State
   const [currentLicense, setCurrentLicense] = useState<ClientLicenseInfo | null>(() => getSavedLicense());
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
   const [isLicenseLocked, setIsLicenseLocked] = useState<boolean>(false);
+
+  // Check for updates on startup (Hot-Update OTA)
+  useEffect(() => {
+    const checkUpdates = async () => {
+      const info = await checkForAppUpdates();
+      if (info && info.hasUpdate) {
+        setUpdateInfo(info);
+        if (info.mandatory) {
+          setIsUpdateModalOpen(true);
+        }
+      }
+    };
+    checkUpdates();
+  }, []);
 
   // Validate license ONLY once on startup (Strict Mandatory Gate, zero background polling)
   useEffect(() => {
@@ -899,6 +919,8 @@ export const App: React.FC = () => {
           setIsLicenseLocked(false);
           setIsLicenseModalOpen(true);
         }}
+        updateInfo={updateInfo}
+        onOpenUpdate={() => setIsUpdateModalOpen(true)}
       />
 
       {/* Main Workspace: Left Player + Right Styling/Editor Panels */}
@@ -1170,25 +1192,36 @@ export const App: React.FC = () => {
               </button>
             </div>
 
-            {/* Bottom Left-aligned: Small Creator Credit */}
-            <p className="text-[10px] text-neutral-400 font-medium text-left tracking-tight border-t border-neutral-100 pt-1.5">
-              Criado por{' '}
-              <a
-                href="https://instagram.com/hokusho"
-                target="_blank"
-                rel="noreferrer"
-                title="Instagram @hokusho"
-                className="font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition"
-              >
-                @hokusho
-              </a>
-            </p>
+            {/* Bottom Left-aligned: Small Creator Credit & Version */}
+            <div className="flex items-center justify-between border-t border-neutral-100 pt-1.5">
+              <p className="text-[10px] text-neutral-400 font-medium text-left tracking-tight">
+                Criado por{' '}
+                <a
+                  href="https://instagram.com/hokusho"
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Instagram @hokusho"
+                  className="font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition"
+                >
+                  @hokusho
+                </a>
+              </p>
+              <span className="text-[9.5px] font-mono font-bold text-neutral-400">
+                v1.1.5
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Global Modals */}
       <PixModal isOpen={isPixModalOpen} onClose={() => setIsPixModalOpen(false)} />
+
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        updateInfo={updateInfo}
+        onClose={() => setIsUpdateModalOpen(false)}
+      />
 
       <ExportModal
         isOpen={isExportOpen}
