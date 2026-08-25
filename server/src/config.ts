@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const PORT = parseInt(process.env.PORT || '4000', 10);
-export const HOST = process.env.HOST || '0.0.0.0';
+export const HOST = process.env.HOST || '127.0.0.1';
 
 export const ROOT_DIR = path.resolve(__dirname, '..');
 export const STORAGE_DIR = path.resolve(ROOT_DIR, 'storage');

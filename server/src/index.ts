@@ -6,33 +6,66 @@ import apiRouter from './routes/api';
 
 const app = express();
 
+import fs from 'fs';
+
+const ALLOWED_ORIGINS = new Set([
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4000',
+  'http://127.0.0.1:4000',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'tauri://localhost',
+  'http://tauri.localhost',
+  'https://tauri.localhost'
+]);
+
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile/desktop apps, curl, or same-origin)
+    if (!origin || ALLOWED_ORIGINS.has(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Blocked by CORS policy'));
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-token']
 }));
+
+// Prevent DNS rebinding attacks
+app.use((req, res, next) => {
+  const host = req.headers.host || '';
+  const hostname = host.split(':')[0].toLowerCase();
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || !hostname) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Access forbidden: Invalid host header' });
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-import fs from 'fs';
-
 // Custom middleware to serve web-compatible MP4 when MOV/non-web file is requested
 app.use('/storage/uploads/:filename', (req, res, next) => {
-  const reqFile = req.params.filename;
-  const ext = path.extname(reqFile).toLowerCase();
-  if (ext === '.mov' || ext === '.mkv' || ext === '.avi' || ext === '.flv') {
-    const mp4Name = `${path.parse(reqFile).name}.mp4`;
-    const mp4Path = path.resolve(STORAGE_DIR, 'uploads', mp4Name);
-    if (fs.existsSync(mp4Path)) {
+  const safeFilename = path.basename(req.params.filename);
+  const ext = path.extname(safeFilename).toLowerCase();
+  if (['.mov', '.mkv', '.avi', '.flv', '.wmv'].includes(ext)) {
+    const mp4Name = `${path.parse(safeFilename).name}.mp4`;
+    const uploadsDir = path.resolve(STORAGE_DIR, 'uploads');
+    const mp4Path = path.resolve(uploadsDir, mp4Name);
+    // Ensure the resolved path is strictly inside uploadsDir
+    if (mp4Path.startsWith(uploadsDir) && fs.existsSync(mp4Path)) {
       return res.sendFile(mp4Path);
     }
   }
   next();
 });
 
-// Serve static storage files (uploaded media, rendered videos)
-app.use('/storage', express.static(STORAGE_DIR));
+// Serve only safe media subdirectories statically (protecting user_settings.json from direct exposure)
+app.use('/storage/uploads', express.static(path.resolve(STORAGE_DIR, 'uploads')));
+app.use('/storage/renders', express.static(path.resolve(STORAGE_DIR, 'renders')));
+app.use('/storage/temp', express.static(path.resolve(STORAGE_DIR, 'temp')));
 
 // Mount API routes
 app.use('/api', apiRouter);

@@ -21,6 +21,7 @@ interface ColorPickerPopoverProps {
   color: string;
   label: string;
   disabled?: boolean;
+  align?: 'left' | 'right';
   onChange: (newColor: string) => void;
 }
 
@@ -50,6 +51,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
   color,
   label,
   disabled = false,
+  align = 'left',
   onChange
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -139,7 +141,7 @@ export const ColorPickerPopover: React.FC<ColorPickerPopoverProps> = ({
 
       {/* Popover Dropdown com Painel 6x6 Cores Fixas + RGB + HEX */}
       {isOpen && !disabled && (
-        <div className="absolute top-full left-0 mt-2 bg-white border-2 border-neutral-900 rounded-2xl p-3.5 shadow-2xl z-50 w-72 flex flex-col gap-3">
+        <div className={`absolute top-full ${align === 'right' ? 'right-0' : 'left-0'} mt-2 bg-white border-2 border-neutral-900 rounded-2xl p-3.5 shadow-2xl z-50 w-72 flex flex-col gap-3`}>
           {/* Header com Preview e Conta-gotas */}
           <div className="flex items-center justify-between border-b border-neutral-200 pb-2.5">
             <div className="flex items-center gap-2">

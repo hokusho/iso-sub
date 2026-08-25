@@ -81,8 +81,8 @@ export const PresetPicker: React.FC<PresetPickerProps> = ({
                   </span>
                   <span
                     style={{
-                      color: st.useWordHighlightBox ? (st.wordHighlightBoxTextColor || '#FFFFFF') : (st.highlightColor || '#FFE600'),
-                      backgroundColor: st.useWordHighlightBox ? (st.wordHighlightBoxColor || st.highlightColor || '#7C3AED') : 'transparent',
+                      color: st.highlightColor || '#FFE600',
+                      backgroundColor: st.useWordHighlightBox ? (st.wordHighlightBoxColor || '#7C3AED') : 'transparent',
                       padding: st.useWordHighlightBox ? '1px 6px' : undefined,
                       borderRadius: st.useWordHighlightBox ? `${st.wordHighlightBoxRadius || 4}px` : undefined,
                       textShadow: (!st.useWordHighlightBox && st.strokeWidth) ? `0 0 4px ${st.strokeColor || '#000000'}` : undefined

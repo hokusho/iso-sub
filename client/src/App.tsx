@@ -109,6 +109,27 @@ export const App: React.FC = () => {
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState<boolean>(false);
   const [isUpdateBalloonOpen, setIsUpdateBalloonOpen] = useState<boolean>(true);
 
+  // Active Blob URL Memory Cleanup
+  const activeBlobUrlRef = useRef<string | null>(null);
+  const setSafeVideoUrl = (url: string | null, isBlob = false) => {
+    if (activeBlobUrlRef.current && activeBlobUrlRef.current !== url) {
+      try { URL.revokeObjectURL(activeBlobUrlRef.current); } catch {}
+      activeBlobUrlRef.current = null;
+    }
+    if (isBlob && url) {
+      activeBlobUrlRef.current = url;
+    }
+    setVideoUrl(url);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (activeBlobUrlRef.current) {
+        try { URL.revokeObjectURL(activeBlobUrlRef.current); } catch {}
+      }
+    };
+  }, []);
+
   // License / Serial State
   const [currentLicense, setCurrentLicense] = useState<ClientLicenseInfo | null>(() => getSavedLicense());
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
@@ -344,7 +365,7 @@ export const App: React.FC = () => {
     try {
       // 1. Instant local video display
       const localBlobUrl = URL.createObjectURL(file);
-      setVideoUrl(localBlobUrl);
+      setSafeVideoUrl(localBlobUrl, true);
       setFileName(file.name);
 
       setProcessStep('uploading');
@@ -379,27 +400,36 @@ export const App: React.FC = () => {
       const resolvedUrl = resolveMediaUrl(data.fileUrl || `/storage/uploads/${data.fileId}`);
       setFileId(data.fileId);
       setFileName(data.originalName || file.name);
-      setVideoUrl(resolvedUrl);
+      setSafeVideoUrl(resolvedUrl, false);
       setMetadata(data.metadata);
       setWaveformPeaks(data.waveformPeaks || []);
-      setDuration(data.metadata.duration || 10);
+      setDuration(data.metadata?.duration || 10);
 
       // Auto-detect Aspect Ratio from Video Metadata (Horizontal 16:9, Vertical 9:16, 1:1, 4:5)
       if (data.metadata?.width && data.metadata?.height) {
-        const isHorizontal = data.metadata.width > data.metadata.height;
-        const detectedRatio: AspectRatio = data.metadata.aspectRatio === '16:9' || isHorizontal
-          ? '16:9'
-          : (data.metadata.aspectRatio === '1:1' ? '1:1' : (data.metadata.aspectRatio === '4:5' ? '4:5' : '9:16'));
+        const ratio = data.metadata.width / data.metadata.height;
+        let detectedRatio: AspectRatio = '9:16';
+        if (data.metadata.aspectRatio === '16:9' || (ratio > 1.35 && data.metadata.aspectRatio !== '9:16')) {
+          detectedRatio = '16:9';
+        } else if (data.metadata.aspectRatio === '1:1' || Math.abs(ratio - 1) < 0.12) {
+          detectedRatio = '1:1';
+        } else if (data.metadata.aspectRatio === '4:5' || Math.abs(ratio - 4 / 5) < 0.12) {
+          detectedRatio = '4:5';
+        } else {
+          detectedRatio = '9:16';
+        }
         setAspectRatio(detectedRatio);
       }
 
-      addToast('info', 'Vídeo carregado', `${data.metadata.width}x${data.metadata.height} (${data.metadata.duration.toFixed(1)}s)`);
+      const durText = typeof data.metadata?.duration === 'number' ? ` (${data.metadata.duration.toFixed(1)}s)` : '';
+      const resText = data.metadata?.width && data.metadata?.height ? `${data.metadata.width}x${data.metadata.height}` : 'Formato padrão';
+      addToast('info', 'Vídeo carregado', `${resText}${durText}`);
 
       // Step 3: Transcription with Whisper
       setProcessStep('transcribing');
       setStatusMessage('Transcrevendo áudio com Whisper e alinhando palavras...');
 
-      await triggerTranscription(data.fileId, data.metadata.duration);
+      await triggerTranscription(data.fileId, data.metadata?.duration || 10);
 
       setProcessStep(null);
       addToast('success', 'Vídeo e legendas prontos!', 'Legendas animadas sincronizadas com o player.');
@@ -513,10 +543,13 @@ export const App: React.FC = () => {
     }, 400);
   };
 
-  // Transcription Trigger
-  const triggerTranscription = async (currentFileId?: string, currentDur = 10) => {
+  // Transcription Dispatcher
+  const triggerTranscription = async (currentFileId?: string, _videoDuration?: number) => {
     const id = currentFileId || fileId;
-    if (!id) return;
+    if (!id) {
+      addToast('warning', 'Nenhum vídeo carregado', 'Faça o upload de um vídeo antes de transcrever.');
+      return;
+    }
 
     try {
       setIsTranscribing(true);
@@ -535,8 +568,12 @@ export const App: React.FC = () => {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Falha na transcrição');
+        let errMsg = 'Falha na transcrição';
+        try {
+          const err = await res.json();
+          errMsg = err.error || errMsg;
+        } catch {}
+        throw new Error(errMsg);
       }
 
       const data = await res.json();
@@ -549,8 +586,8 @@ export const App: React.FC = () => {
       addToast('success', 'Transcrição concluída', `${loadedBlocks.length} blocos de legenda gerados.`);
     } catch (err: any) {
       setIsTranscribing(false);
-      console.warn('Transcription failed, using fallback speech alignment:', err);
-      addToast('warning', 'Alinhamento Offline Ativado', 'Transcrição processada com modelo de cadência local.');
+      console.error('Transcription error:', err);
+      addToast('error', 'Falha na Transcrição', err.message || 'Verifique sua chave de API em Configurações.');
     }
   };
 
@@ -995,6 +1032,7 @@ export const App: React.FC = () => {
                     duration={duration}
                     aspectRatio={aspectRatio}
                     safeZoneMode={safeZoneMode}
+                    onAspectRatioDetected={(detected) => setAspectRatio(detected)}
                     onTimeUpdate={(t) => setCurrentTime(t)}
                     onDurationChange={(d) => setDuration(d)}
                     onTogglePlay={togglePlay}

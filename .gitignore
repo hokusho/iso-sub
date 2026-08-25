@@ -55,6 +55,8 @@ desktop.ini
 
 # Architecture & AI Agent Specs (Never commit to Git)
 architecture-docs/
+architecture/
+architecture-docs.zip
 
 # Private Admin License Dashboard & Keys (Never commit to Git)
 admin-license/
@@ -63,10 +65,8 @@ license-server/
 licenses.json
 server/storage/licenses.json
 
-<<<<<<< HEAD
-=======
-# Local Architecture Documentation (Private AI agent specs)
-architecture-docs/
-architecture/
+# Runtime settings with secrets (NEVER commit - contains API keys/serials)
+server/storage/user_settings.json
 
->>>>>>> 8e46ce5ac62c6f5292f4a96fd15f5a02291d4a78
+# Audit report
+AUDITORIA.md

@@ -221,30 +221,36 @@ export async function transcribeAudio(
 
   let words: SubtitleWord[] = [];
 
-  if (provider === 'groq' && groqKey) {
+  if (provider === 'local') {
+    words = generateLocalFallbackWords(duration);
+  } else if (provider === 'groq') {
+    if (!groqKey) {
+      throw new Error('Chave da API Groq não configurada. Adicione sua chave gratuita em Configurações > Chaves de API.');
+    }
     words = await transcribeWithGroq(audioPath, groqKey, options.language);
-  } else if (provider === 'openai' && openaiKey) {
+  } else if (provider === 'openai') {
+    if (!openaiKey) {
+      throw new Error('Chave da API OpenAI não configurada. Adicione sua chave em Configurações > Chaves de API.');
+    }
     words = await transcribeWithOpenAI(audioPath, openaiKey, options.language);
-  } else if (provider === 'auto') {
+  } else {
+    // provider === 'auto'
     if (groqKey) {
       try {
         words = await transcribeWithGroq(audioPath, groqKey, options.language);
-      } catch (err) {
-        console.warn('Groq transcription failed, trying OpenAI or Fallback:', err);
+      } catch (err: any) {
+        console.warn('Groq transcription failed, trying OpenAI if available:', err);
         if (openaiKey) {
           words = await transcribeWithOpenAI(audioPath, openaiKey, options.language);
         } else {
-          words = generateLocalFallbackWords(duration);
+          throw new Error(`Falha na transcrição Groq: ${err.message || 'Verifique sua chave e conexão.'}`);
         }
       }
     } else if (openaiKey) {
       words = await transcribeWithOpenAI(audioPath, openaiKey, options.language);
     } else {
-      // Fallback
-      words = generateLocalFallbackWords(duration);
+      throw new Error('Nenhuma chave de API configurada. Adicione sua chave da Groq (Whisper Large v3) nas configurações.');
     }
-  } else {
-    words = generateLocalFallbackWords(duration);
   }
 
   const blocks = groupWordsIntoBlocks(words, wordsPerBlock);

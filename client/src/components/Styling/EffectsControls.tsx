@@ -1,6 +1,7 @@
 import React from 'react';
 import { SubtitleStyle, AnimationType } from '../../types';
 import { Sparkles } from 'lucide-react';
+import { ColorPickerPopover } from './ColorPickerPopover';
 
 interface EffectsControlsProps {
   style: SubtitleStyle;
@@ -154,7 +155,7 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
         <div className={`flex flex-col gap-2.5 p-3 rounded-xl border-2 transition ${
           isStrokeEnabled ? 'bg-neutral-100 border-neutral-300' : 'bg-neutral-50/80 border-neutral-200'
         }`}>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <span className="text-xs font-black text-neutral-900">Contorno</span>
               <button
@@ -173,13 +174,16 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
               </button>
             </div>
 
-            <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded border ${
-              isStrokeEnabled 
-                ? 'text-neutral-900 bg-white border-neutral-300' 
-                : 'text-neutral-500 bg-neutral-200/60 border-neutral-200'
-            }`}>
-              {isStrokeEnabled ? `${style.strokeWidth}px` : 'OFF'}
-            </span>
+            {isStrokeEnabled && (
+              <div className="shrink-0">
+                <ColorPickerPopover
+                  color={style.strokeColor?.startsWith('#') ? style.strokeColor : '#000000'}
+                  label="Contorno"
+                  align="right"
+                  onChange={(c) => onChange({ strokeColor: c })}
+                />
+              </div>
+            )}
           </div>
 
           {isStrokeEnabled && (
@@ -195,14 +199,6 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
                 className="flex-1 h-2.5 bg-neutral-300 rounded-lg accent-neutral-900 cursor-pointer"
               />
               <span className="text-xs font-mono font-black text-neutral-900 w-9 text-center">{style.strokeWidth}px</span>
-              <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border-2 border-neutral-400 cursor-pointer shadow-sm">
-                <input
-                  type="color"
-                  value={style.strokeColor?.startsWith('#') ? style.strokeColor : '#000000'}
-                  onChange={(e) => onChange({ strokeColor: e.target.value.toUpperCase() })}
-                  className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer border-0"
-                />
-              </div>
             </div>
           )}
         </div>
@@ -211,7 +207,7 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
         <div className={`flex flex-col gap-2.5 p-3 rounded-xl border-2 transition ${
           isShadowEnabled ? 'bg-neutral-100 border-neutral-300' : 'bg-neutral-50/80 border-neutral-200'
         }`}>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <span className="text-xs font-black text-neutral-900">Sombra</span>
               <button
@@ -230,13 +226,16 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
               </button>
             </div>
 
-            <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded border ${
-              isShadowEnabled 
-                ? 'text-neutral-900 bg-white border-neutral-300' 
-                : 'text-neutral-500 bg-neutral-200/60 border-neutral-200'
-            }`}>
-              {isShadowEnabled ? `${style.shadowBlur ?? 0}px blur` : 'OFF'}
-            </span>
+            {isShadowEnabled && (
+              <div className="shrink-0">
+                <ColorPickerPopover
+                  color={style.shadowColor?.startsWith('#') ? style.shadowColor : '#000000'}
+                  label="Sombra"
+                  align="right"
+                  onChange={(c) => onChange({ shadowColor: c })}
+                />
+              </div>
+            )}
           </div>
 
           {isShadowEnabled && (
@@ -255,14 +254,6 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
                 <span className="text-xs font-mono font-black text-neutral-900 w-9 text-center">
                   {style.shadowBlur ?? 0}px
                 </span>
-                <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border-2 border-neutral-400 cursor-pointer shadow-sm">
-                  <input
-                    type="color"
-                    value={style.shadowColor?.startsWith('#') ? style.shadowColor : '#000000'}
-                    onChange={(e) => onChange({ shadowColor: e.target.value.toUpperCase() })}
-                    className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer border-0"
-                  />
-                </div>
               </div>
 
               <div className="flex items-center justify-between gap-3 pt-1 border-t border-neutral-200/60">
@@ -279,7 +270,6 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
                 <span className="text-xs font-mono font-black text-neutral-900 w-9 text-center">
                   {style.shadowDistance ?? 4}px
                 </span>
-                <div className="w-8 shrink-0" />
               </div>
             </div>
           )}
@@ -289,7 +279,7 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
         <div className={`flex flex-col gap-2.5 p-3 rounded-xl border-2 transition ${
           isBoxEnabled ? 'bg-neutral-100 border-neutral-300' : 'bg-neutral-50/80 border-neutral-200'
         }`}>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <span className="text-xs font-black text-neutral-900">Caixa de Fundo (Bloco)</span>
               <button
@@ -308,13 +298,16 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
               </button>
             </div>
 
-            <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded border ${
-              isBoxEnabled 
-                ? 'text-neutral-900 bg-white border-neutral-300' 
-                : 'text-neutral-500 bg-neutral-200/60 border-neutral-200'
-            }`}>
-              {isBoxEnabled ? `${Math.round((style.boxOpacity || 0.85) * 100)}%` : 'OFF'}
-            </span>
+            {isBoxEnabled && (
+              <div className="shrink-0">
+                <ColorPickerPopover
+                  color={style.boxColor || '#000000'}
+                  label="Fundo do Bloco"
+                  align="right"
+                  onChange={(c) => onChange({ boxColor: c })}
+                />
+              </div>
+            )}
           </div>
 
           {isBoxEnabled && (
@@ -332,14 +325,6 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
               <span className="text-xs font-mono font-black text-neutral-900 w-11 text-center">
                 {Math.round((style.boxOpacity || 0.85) * 100)}%
               </span>
-              <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border-2 border-neutral-400 cursor-pointer shadow-sm">
-                <input
-                  type="color"
-                  value={style.boxColor || '#000000'}
-                  onChange={(e) => onChange({ boxColor: e.target.value.toUpperCase() })}
-                  className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer border-0"
-                />
-              </div>
             </div>
           )}
         </div>
@@ -348,7 +333,7 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
         <div className={`flex flex-col gap-2.5 p-3 rounded-xl border-2 transition ${
           style.useWordHighlightBox ? 'bg-neutral-100 border-neutral-300' : 'bg-neutral-50/80 border-neutral-200'
         }`}>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
               <span className="text-xs font-black text-neutral-900">Caixa Destaque na Palavra</span>
               <button
@@ -373,40 +358,33 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
               </button>
             </div>
 
-            <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded border ${
-              style.useWordHighlightBox 
-                ? 'text-neutral-900 bg-white border-neutral-300' 
-                : 'text-neutral-500 bg-neutral-200/60 border-neutral-200'
-            }`}>
-              {style.useWordHighlightBox ? 'ON' : 'OFF'}
-            </span>
+            {style.useWordHighlightBox && (
+              <div className="shrink-0">
+                <ColorPickerPopover
+                  color={style.wordHighlightBoxColor || style.highlightColor || '#7C3AED'}
+                  label="Caixa Destaque"
+                  align="right"
+                  onChange={(c) => onChange({ wordHighlightBoxColor: c, highlightColor: c })}
+                />
+              </div>
+            )}
           </div>
 
           {style.useWordHighlightBox && (
-            <div className="flex flex-col gap-2 pt-2 border-t border-neutral-200">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold text-neutral-700 min-w-[70px]">Arredondado</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="16"
-                  step="1"
-                  value={style.wordHighlightBoxRadius ?? 8}
-                  onChange={(e) => onChange({ wordHighlightBoxRadius: parseInt(e.target.value, 10) })}
-                  className="flex-1 h-2.5 bg-neutral-300 rounded-lg accent-neutral-900 cursor-pointer"
-                />
-                <span className="text-xs font-mono font-black text-neutral-900 w-11 text-center">
-                  {style.wordHighlightBoxRadius ?? 8}px
-                </span>
-                <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border-2 border-neutral-400 cursor-pointer shadow-sm">
-                  <input
-                    type="color"
-                    value={style.wordHighlightBoxColor || style.highlightColor || '#7C3AED'}
-                    onChange={(e) => onChange({ wordHighlightBoxColor: e.target.value.toUpperCase(), highlightColor: e.target.value.toUpperCase() })}
-                    className="absolute -top-2 -left-2 w-12 h-12 cursor-pointer border-0"
-                  />
-                </div>
-              </div>
+            <div className="flex items-center justify-between gap-3 pt-2 border-t border-neutral-200">
+              <span className="text-xs font-bold text-neutral-700 min-w-[70px]">Arredondado</span>
+              <input
+                type="range"
+                min="0"
+                max="16"
+                step="1"
+                value={style.wordHighlightBoxRadius ?? 8}
+                onChange={(e) => onChange({ wordHighlightBoxRadius: parseInt(e.target.value, 10) })}
+                className="flex-1 h-2.5 bg-neutral-300 rounded-lg accent-neutral-900 cursor-pointer"
+              />
+              <span className="text-xs font-mono font-black text-neutral-900 w-11 text-center">
+                {style.wordHighlightBoxRadius ?? 8}px
+              </span>
             </div>
           )}
         </div>

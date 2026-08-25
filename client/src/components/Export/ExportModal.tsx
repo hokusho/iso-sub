@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Download,
   FolderOpen,
@@ -50,6 +50,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [renderJob, setRenderJob] = useState<RenderJobProgress | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [explorerSuccess, setExplorerSuccess] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  const closeEventSource = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      closeEventSource();
+    };
+  }, []);
 
   // Auto-detect best platform preset based on video proportions
   useEffect(() => {
@@ -174,8 +188,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     }
   };
 
+  const handleClose = () => {
+    closeEventSource();
+    setIsRendering(false);
+    onClose();
+  };
+
   const listenToProgress = (jobId: string) => {
+    closeEventSource();
     const eventSource = new EventSource(apiEndpoint(`/api/progress/${jobId}`));
+    eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (e) => {
       try {
@@ -184,11 +206,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
         if (data.status === 'completed') {
           setIsRendering(false);
-          eventSource.close();
+          closeEventSource();
         } else if (data.status === 'error') {
           setIsRendering(false);
           setErrorMsg(data.error || 'Erro na renderização');
-          eventSource.close();
+          closeEventSource();
         }
       } catch (err) {
         console.error(err);
@@ -196,7 +218,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     };
 
     eventSource.onerror = () => {
-      eventSource.close();
+      setIsRendering(false);
+      closeEventSource();
     };
   };
 
@@ -230,10 +253,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     const { width, height } = metadata;
     const ratio = width / height;
 
-    if (Math.abs(ratio - 16 / 9) < 0.05) return '16:9 Horizontal';
-    if (Math.abs(ratio - 9 / 16) < 0.05) return '9:16 Vertical';
-    if (Math.abs(ratio - 1) < 0.05) return '1:1 Quadrado';
-    if (Math.abs(ratio - 4 / 5) < 0.05) return '4:5 Retrato';
+    if (Math.abs(ratio - 16 / 9) < 0.15 || ratio > 1.35) return '16:9 Horizontal';
+    if (Math.abs(ratio - 9 / 16) < 0.15 || ratio < 0.75) return '9:16 Vertical';
+    if (Math.abs(ratio - 1) < 0.12) return '1:1 Quadrado';
+    if (Math.abs(ratio - 4 / 5) < 0.12) return '4:5 Retrato';
     return `${width}x${height} Nativo`;
   };
 
@@ -254,7 +277,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-xl text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -537,7 +560,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               {/* Actions */}
               <div className="flex items-center justify-end gap-3 mt-1 pt-3 border-t border-neutral-200">
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   disabled={isRendering}
                   className="px-5 py-2.5 rounded-xl text-xs font-bold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition disabled:opacity-50 cursor-pointer"
                 >

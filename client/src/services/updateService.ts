@@ -2,7 +2,7 @@
  * ISO SUB — Hot-Update / OTA Service (Atualizações sem reinstalar)
  */
 
-export const CURRENT_APP_VERSION = '1.1.8';
+export const CURRENT_APP_VERSION = '1.1.9';
 
 const SUPABASE_URL = 'https://trrewoowgbhyfceumrlt.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRycmV3b293Z2JoeWZjZXVtcmx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1ODEyODAsImV4cCI6MjEwMzE1NzI4MH0.f_qkTF1PHgvmQMr12XgectaWCD1PquY6GSZItLM8IlE';

@@ -85,26 +85,59 @@ export async function validateLicenseOnline(userName: string, serialKey: string)
   }
 
   try {
-    // Query Supabase directly
-    const url = `${SUPABASE_URL}/rest/v1/licenses?serial=eq.${encodeURIComponent(cleanSerial)}&select=*`;
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
+    // 1. First try the secure RPC function (which handles device binding on the server)
+    let lic: any = null;
+    try {
+      const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_and_register_device`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          p_serial: cleanSerial,
+          p_device_id: deviceId
+        })
+      });
+
+      if (rpcRes.ok) {
+        const rpcData = await rpcRes.json();
+        if (rpcData && !rpcData.success) {
+          return {
+            valid: false,
+            reason: rpcData.reason || 'invalid',
+            message: rpcData.message || 'Chave de serial inválida ou limite excedido.'
+          };
+        }
+        if (rpcData && rpcData.license) {
+          lic = rpcData.license;
+        }
       }
-    });
-
-    if (!res.ok) {
-      throw new Error(`Erro ao conectar ao Supabase: HTTP ${res.status}`);
+    } catch (rpcErr) {
+      console.warn('RPC endpoint check failed, using direct query fallback:', rpcErr);
     }
 
-    const data = await res.json();
+    // 2. Direct read fallback if RPC wasn't available
+    if (!lic) {
+      const url = `${SUPABASE_URL}/rest/v1/licenses?serial=eq.${encodeURIComponent(cleanSerial)}&select=*`;
+      const res = await fetch(url, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
 
-    if (!data || data.length === 0) {
-      return { valid: false, reason: 'not_found', message: 'Chave de serial não encontrada no sistema.' };
+      if (!res.ok) {
+        throw new Error(`Erro ao conectar ao Supabase: HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        return { valid: false, reason: 'not_found', message: 'Chave de serial não encontrada no sistema.' };
+      }
+      lic = data[0];
     }
-
-    const lic = data[0];
 
     // 1. Check Name match (case-insensitive)
     const registeredName = (lic.customer_name || '').trim().toLowerCase();
@@ -126,7 +159,7 @@ export async function validateLicenseOnline(userName: string, serialKey: string)
     }
 
     // 3. Check Expiration Date
-    const isLifetime = !lic.expires_at || lic.duration_days === 'vitalicio';
+    const isLifetime = !lic.expires_at || String(lic.duration_days).toLowerCase() === 'vitalicio' || (typeof lic.duration_days === 'number' && lic.duration_days >= 3650);
     let daysRemaining = 9999;
 
     if (!isLifetime && lic.expires_at) {
@@ -148,38 +181,8 @@ export async function validateLicenseOnline(userName: string, serialKey: string)
     }
 
     // 4. Device Binding Check (HWID)
-    let devices: string[] = Array.isArray(lic.active_devices) ? [...lic.active_devices] : [];
+    const devices: string[] = Array.isArray(lic.active_devices) ? [...lic.active_devices] : [];
     const maxDevices = lic.max_devices || 1;
-    const isAlreadyBound = devices.includes(deviceId);
-
-    if (!isAlreadyBound) {
-      if (devices.length >= maxDevices) {
-        return {
-          valid: false,
-          reason: 'device_limit_exceeded',
-          message: `Limite de computadores atingido (${maxDevices} PC). Solicite o reset no painel administrativo.`,
-          customerName: lic.customer_name,
-          maxDevices,
-          activeDevicesCount: devices.length
-        };
-      }
-
-      // Bind new device
-      devices.push(deviceId);
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/licenses?id=eq.${encodeURIComponent(lic.id)}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ active_devices: devices })
-        });
-      } catch (patchErr) {
-        console.warn('Could not update active_devices on Supabase:', patchErr);
-      }
-    }
 
     // Save locally
     const licenseInfo: ClientLicenseInfo = {

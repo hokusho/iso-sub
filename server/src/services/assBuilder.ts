@@ -223,6 +223,7 @@ export function buildAssSubtitle(options: AssBuilderOptions): string {
 
   const primaryColorAss = hexToAssColor(style.textColor || '#FFFFFF', 0);
   const highlightColorAss = hexToAssColor(style.highlightColor || '#FFE600', 0);
+  const wordBoxColorAss = hexToAssColor(style.wordHighlightBoxColor || style.highlightColor || '#7C3AED', 0);
   
   const hasStroke = (style.strokeWidth && style.strokeWidth > 0);
   const outlineColorAss = hasStroke
@@ -419,8 +420,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         }
 
         // Layer 2: Foreground Text
-        const textColor = (isWordActive && style.useWordHighlightBox)
-          ? wordBoxTextColorAss
+        const textColor = isWordActive
+          ? highlightColorAss
           : isWordHighlighted
           ? highlightColorAss
           : primaryColorAss;

@@ -23,6 +23,7 @@ interface CanvasPreviewProps {
   duration: number;
   aspectRatio: AspectRatio;
   safeZoneMode: SafeZoneMode;
+  onAspectRatioDetected?: (ratio: AspectRatio) => void;
   onTimeUpdate?: (time: number) => void;
   onDurationChange?: (dur: number) => void;
   onTogglePlay?: () => void;
@@ -38,6 +39,7 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
   duration,
   aspectRatio,
   safeZoneMode,
+  onAspectRatioDetected,
   onTimeUpdate,
   onDurationChange,
   onTogglePlay,
@@ -314,9 +316,7 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
         }
 
         // 3. Pass 3: Preenchimento do Texto (Camada Frontal Layer 2 - 100% Cristalino e Nítido)
-        const textFillColor = (isWordActive && style.useWordHighlightBox)
-          ? (style.wordHighlightBoxTextColor || '#FFFFFF')
-          : isWordActive
+        const textFillColor = isWordActive
           ? (style.highlightColor || '#FFE600')
           : (style.textColor || '#FFFFFF');
 
@@ -368,6 +368,20 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
           const target = e.target as HTMLVideoElement;
           if (onDurationChange && target.duration) {
             onDurationChange(target.duration);
+          }
+          if (onAspectRatioDetected && target.videoWidth && target.videoHeight) {
+            const ratio = target.videoWidth / target.videoHeight;
+            let detected: AspectRatio = '9:16';
+            if (ratio > 1.35) {
+              detected = '16:9';
+            } else if (Math.abs(ratio - 1) < 0.12) {
+              detected = '1:1';
+            } else if (Math.abs(ratio - 0.8) < 0.12) {
+              detected = '4:5';
+            } else {
+              detected = '9:16';
+            }
+            onAspectRatioDetected(detected);
           }
         }}
         className="w-full h-full object-contain pointer-events-auto cursor-pointer"

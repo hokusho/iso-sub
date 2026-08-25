@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CheckCircle2, AlertCircle, Info, Sparkles, X } from 'lucide-react';
 
 export interface ToastMessage {
@@ -24,12 +24,15 @@ export const ToastContainer: React.FC<ToastProps> = ({ toasts, onRemove }) => {
 };
 
 const ToastItem: React.FC<{ toast: ToastMessage; onRemove: () => void }> = ({ toast, onRemove }) => {
+  const onRemoveRef = useRef(onRemove);
+  onRemoveRef.current = onRemove;
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      onRemove();
+      onRemoveRef.current();
     }, 4000);
     return () => clearTimeout(timer);
-  }, [toast, onRemove]);
+  }, [toast.id]);
 
   const getIcon = () => {
     switch (toast.type) {

@@ -35,6 +35,10 @@ export function probeVideo(filePath: string): Promise<VideoMetadata> {
     let output = '';
     let errorOutput = '';
 
+    probe.on('error', (err) => {
+      reject(new Error(`ffprobe process error: ${err.message}`));
+    });
+
     probe.stdout.on('data', (data) => { output += data.toString(); });
     probe.stderr.on('data', (data) => { errorOutput += data.toString(); });
 
@@ -51,6 +55,26 @@ export function probeVideo(filePath: string): Promise<VideoMetadata> {
 
         let width = videoStream?.width || 1080;
         let height = videoStream?.height || 1920;
+
+        // Check for smartphone / mobile rotation tags (e.g. 90deg or 270deg Display Matrix)
+        let rotation = 0;
+        if (videoStream?.tags?.rotate) {
+          rotation = Math.abs(parseInt(videoStream.tags.rotate, 10));
+        } else if (format?.tags?.rotate) {
+          rotation = Math.abs(parseInt(format.tags.rotate, 10));
+        } else if (Array.isArray(videoStream?.side_data_list)) {
+          const displayMatrix = videoStream.side_data_list.find((s: any) => typeof s.rotation === 'number');
+          if (displayMatrix) {
+            rotation = Math.abs(Math.round(displayMatrix.rotation));
+          }
+        }
+
+        if (rotation === 90 || rotation === 270) {
+          const temp = width;
+          width = height;
+          height = temp;
+        }
+
         let duration = parseFloat(videoStream?.duration || format.duration || '0');
         let sizeBytes = parseInt(format.size || '0', 10);
 
@@ -64,11 +88,11 @@ export function probeVideo(filePath: string): Promise<VideoMetadata> {
 
         let aspectRatio = '9:16';
         const ratio = width / height;
-        if (Math.abs(ratio - 9 / 16) < 0.1) aspectRatio = '9:16';
-        else if (Math.abs(ratio - 16 / 9) < 0.1) aspectRatio = '16:9';
-        else if (Math.abs(ratio - 1) < 0.1) aspectRatio = '1:1';
-        else if (Math.abs(ratio - 4 / 5) < 0.1) aspectRatio = '4:5';
-        else aspectRatio = `${width}:${height}`;
+        if (Math.abs(ratio - 9 / 16) < 0.15 || ratio < 0.75) aspectRatio = '9:16';
+        else if (Math.abs(ratio - 16 / 9) < 0.15 || ratio > 1.35) aspectRatio = '16:9';
+        else if (Math.abs(ratio - 1) < 0.12) aspectRatio = '1:1';
+        else if (Math.abs(ratio - 4 / 5) < 0.12) aspectRatio = '4:5';
+        else aspectRatio = height > width ? '9:16' : '16:9';
 
         resolve({
           duration,
@@ -110,6 +134,10 @@ export function convertToWebFriendlyMp4(inputPath: string, outputPath: string): 
     const proc = spawn(FFMPEG_PATH, args);
     let errOutput = '';
 
+    proc.on('error', (err) => {
+      reject(new Error(`FFmpeg web conversion process error: ${err.message}`));
+    });
+
     proc.stderr.on('data', (data) => { errOutput += data.toString(); });
     proc.on('close', (code) => {
       if (code === 0) resolve();
@@ -136,6 +164,10 @@ export function extractAudioToWav(videoPath: string, outputWavPath: string): Pro
     const proc = spawn(FFMPEG_PATH, args);
     let errOutput = '';
 
+    proc.on('error', (err) => {
+      reject(new Error(`FFmpeg audio extract process error: ${err.message}`));
+    });
+
     proc.stderr.on('data', (data) => { errOutput += data.toString(); });
     proc.on('close', (code) => {
       if (code === 0) resolve();
@@ -148,7 +180,7 @@ export function extractAudioToWav(videoPath: string, outputWavPath: string): Pro
  * Extracts audio waveform peaks as normalized float array (0.0 to 1.0)
  */
 export function generateWaveformPeaks(audioOrVideoPath: string, numPeaks = 600): Promise<number[]> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     // Extract raw 8-bit unsigned PCM at a low sample rate to read amplitudes directly
     const sampleRate = 8000;
     const args = [
@@ -162,6 +194,13 @@ export function generateWaveformPeaks(audioOrVideoPath: string, numPeaks = 600):
 
     const proc = spawn(FFMPEG_PATH, args);
     const chunks: Buffer[] = [];
+
+    proc.on('error', () => {
+      resolve(Array.from({ length: numPeaks }, () => 0.1));
+    });
+
+    // Drain stderr to prevent process deadlock on long media
+    proc.stderr.on('data', () => {});
 
     proc.stdout.on('data', (chunk) => {
       chunks.push(chunk);
@@ -276,6 +315,10 @@ export function renderMp4WithAss(
     const proc = spawn(FFMPEG_PATH, args);
     let stderr = '';
 
+    proc.on('error', (err) => {
+      reject(new Error(`FFmpeg MP4 render process error: ${err.message}`));
+    });
+
     proc.stderr.on('data', (data) => {
       const text = data.toString();
       stderr += text;
@@ -332,6 +375,10 @@ export function renderProResWithAlpha(
     const proc = spawn(FFMPEG_PATH, args);
     let stderr = '';
 
+    proc.on('error', (err) => {
+      reject(new Error(`FFmpeg ProRes render process error: ${err.message}`));
+    });
+
     proc.stderr.on('data', (data) => {
       const text = data.toString();
       stderr += text;
@@ -363,6 +410,9 @@ export function renderProResWithAlpha(
           outputPath
         ];
         const fallbackProc = spawn(FFMPEG_PATH, fallbackArgs);
+        fallbackProc.on('error', (err) => {
+          reject(new Error(`FFmpeg fallback transparent render process error: ${err.message}`));
+        });
         fallbackProc.on('close', (fbCode) => {
           if (fbCode === 0) {
             if (onProgress) onProgress({ percent: 100, currentSec: duration, fps: 0 });

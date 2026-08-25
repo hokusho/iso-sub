@@ -43,12 +43,17 @@ function broadcastProgress(jobId: string, progress: RenderJobProgress) {
 }
 
 // Multer storage for uploads
+const ALLOWED_EXTENSIONS = new Set([
+  '.mp4', '.mov', '.mkv', '.avi', '.webm', '.flv', '.wmv',
+  '.mp3', '.wav', '.m4a', '.aac', '.ogg'
+]);
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, UPLOAD_DIR);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
     const uniqueName = `${Date.now()}-${uuidv4().substring(0, 8)}${ext}`;
     cb(null, uniqueName);
   }
@@ -56,7 +61,15 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 1024 * 1024 * 500 } // 500MB
+  limits: { fileSize: 1024 * 1024 * 500 }, // 500MB
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_EXTENSIONS.has(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Tipo de arquivo inválido (${ext}). Formatos suportados: MP4, MOV, MKV, AVI, WEBM, MP3, WAV, etc.`));
+    }
+  }
 });
 
 /**
@@ -92,13 +105,13 @@ router.post('/upload', upload.single('media'), async (req: Request, res: Respons
       console.log(`Transcoding non-web video (${metadata.videoCodec || ext}) to web-compatible MP4...`);
       await convertToWebFriendlyMp4(filePath, tempConvertedPath);
 
-      // Safely replace/move to final destination without in-place collision
-      if (fs.existsSync(filePath)) {
-        try { fs.unlinkSync(filePath); } catch {}
-      }
-
+      // Safely copy converted file before deleting original to prevent data loss
       fs.copyFileSync(tempConvertedPath, finalMp4Path);
       try { fs.unlinkSync(tempConvertedPath); } catch {}
+
+      if (filePath !== finalMp4Path && fs.existsSync(filePath)) {
+        try { fs.unlinkSync(filePath); } catch {}
+      }
 
       finalFileName = finalMp4FileName;
       finalFilePath = finalMp4Path;
@@ -138,13 +151,14 @@ router.post('/transcribe', async (req: Request, res: Response): Promise<void> =>
   try {
     const { fileId, provider, apiKey, language, wordsPerBlock = 3 } = req.body;
 
-    if (!fileId) {
-      res.status(400).json({ error: 'Missing fileId' });
+    if (!fileId || typeof fileId !== 'string') {
+      res.status(400).json({ error: 'Missing or invalid fileId' });
       return;
     }
 
-    const wavPath = path.resolve(TEMP_DIR, `${path.parse(fileId).name}.wav`);
-    const originalPath = path.resolve(UPLOAD_DIR, fileId);
+    const safeFileId = path.basename(fileId);
+    const wavPath = path.resolve(TEMP_DIR, `${path.parse(safeFileId).name}.wav`);
+    const originalPath = path.resolve(UPLOAD_DIR, safeFileId);
     const mediaPath = fs.existsSync(wavPath) ? wavPath : originalPath;
 
     if (!fs.existsSync(mediaPath)) {
@@ -211,12 +225,13 @@ router.post('/render/mp4', async (req: Request, res: Response): Promise<void> =>
       optimize50MB?: boolean;
     } = req.body;
 
-    if (!fileId || !blocks || !style) {
+    if (!fileId || !blocks || !style || typeof fileId !== 'string') {
       res.status(400).json({ error: 'Missing required parameters (fileId, blocks, style)' });
       return;
     }
 
-    const inputVideoPath = path.resolve(UPLOAD_DIR, fileId);
+    const safeFileId = path.basename(fileId);
+    const inputVideoPath = path.resolve(UPLOAD_DIR, safeFileId);
     if (!fs.existsSync(inputVideoPath)) {
       res.status(404).json({ error: 'Source video file not found' });
       return;
@@ -254,6 +269,14 @@ router.post('/render/mp4', async (req: Request, res: Response): Promise<void> =>
     };
     renderJobs.set(jobId, initialJob);
 
+    // Schedule cleanup of in-memory job status after 5 minutes
+    const scheduleJobCleanup = () => {
+      setTimeout(() => {
+        renderJobs.delete(jobId);
+        sseClients.delete(jobId);
+      }, 5 * 60 * 1000);
+    };
+
     // Run render asynchronously
     renderMp4WithAss(
       inputVideoPath,
@@ -273,6 +296,7 @@ router.post('/render/mp4', async (req: Request, res: Response): Promise<void> =>
       }
     )
       .then((out) => {
+        try { if (fs.existsSync(assPath)) fs.unlinkSync(assPath); } catch {}
         const stats = fs.statSync(out);
         broadcastProgress(jobId, {
           jobId,
@@ -282,8 +306,10 @@ router.post('/render/mp4', async (req: Request, res: Response): Promise<void> =>
           outputFilePath: outputPath,
           outputFileSize: stats.size
         });
+        scheduleJobCleanup();
       })
       .catch((err) => {
+        try { if (fs.existsSync(assPath)) fs.unlinkSync(assPath); } catch {}
         console.error(`Render job ${jobId} failed:`, err);
         broadcastProgress(jobId, {
           jobId,
@@ -291,6 +317,7 @@ router.post('/render/mp4', async (req: Request, res: Response): Promise<void> =>
           progressPercent: 0,
           error: err.message
         });
+        scheduleJobCleanup();
       });
 
     res.json({ jobId, outputFileName });
@@ -351,6 +378,14 @@ router.post('/render/prores', async (req: Request, res: Response): Promise<void>
     };
     renderJobs.set(jobId, initialJob);
 
+    // Schedule cleanup of in-memory job status after 5 minutes
+    const scheduleJobCleanup = () => {
+      setTimeout(() => {
+        renderJobs.delete(jobId);
+        sseClients.delete(jobId);
+      }, 5 * 60 * 1000);
+    };
+
     renderProResWithAlpha(
       assPath,
       duration,
@@ -370,6 +405,7 @@ router.post('/render/prores', async (req: Request, res: Response): Promise<void>
       }
     )
       .then((out) => {
+        try { if (fs.existsSync(assPath)) fs.unlinkSync(assPath); } catch {}
         const stats = fs.statSync(out);
         broadcastProgress(jobId, {
           jobId,
@@ -379,8 +415,10 @@ router.post('/render/prores', async (req: Request, res: Response): Promise<void>
           outputFilePath: outputPath,
           outputFileSize: stats.size
         });
+        scheduleJobCleanup();
       })
       .catch((err) => {
+        try { if (fs.existsSync(assPath)) fs.unlinkSync(assPath); } catch {}
         console.error(`ProRes render ${jobId} failed:`, err);
         broadcastProgress(jobId, {
           jobId,
@@ -388,6 +426,7 @@ router.post('/render/prores', async (req: Request, res: Response): Promise<void>
           progressPercent: 0,
           error: err.message
         });
+        scheduleJobCleanup();
       });
 
     res.json({ jobId, outputFileName });
@@ -710,14 +749,21 @@ router.post('/license/save', (req: Request, res: Response): void => {
 
 /**
  * GET /api/user-settings
- * Returns stored user settings (license info, Groq API key, etc.)
+ * Returns stored user settings (license info, masked key flags)
  */
 router.get('/user-settings', (req: Request, res: Response): void => {
   try {
     const settingsFile = path.resolve(STORAGE_DIR, 'user_settings.json');
     if (fs.existsSync(settingsFile)) {
       const data = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
-      res.json({ success: true, settings: data });
+      const safeData = {
+        ...data,
+        groqKeySet: !!data.groqKey,
+        openaiKeySet: !!data.openaiKey
+      };
+      delete safeData.groqKey;
+      delete safeData.openaiKey;
+      res.json({ success: true, settings: safeData });
       return;
     }
     res.json({ success: true, settings: {} });
@@ -744,7 +790,16 @@ router.post('/user-settings', (req: Request, res: Response): void => {
     }
     const merged = { ...existing, ...settings, updatedAt: new Date().toISOString() };
     fs.writeFileSync(settingsFile, JSON.stringify(merged, null, 2), 'utf-8');
-    res.json({ success: true, settings: merged });
+    
+    // Return masked settings
+    const safeMerged = {
+      ...merged,
+      groqKeySet: !!merged.groqKey,
+      openaiKeySet: !!merged.openaiKey
+    };
+    delete safeMerged.groqKey;
+    delete safeMerged.openaiKey;
+    res.json({ success: true, settings: safeMerged });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -752,13 +807,31 @@ router.post('/user-settings', (req: Request, res: Response): void => {
 
 /**
  * POST /api/updates/apply
- * Downloads and extracts an OTA bundle into client/dist directory
+ * Downloads and extracts an OTA bundle from trusted Supabase storage into client/dist
  */
 router.post('/updates/apply', async (req: Request, res: Response): Promise<void> => {
   try {
     const { bundleUrl } = req.body;
     if (!bundleUrl || typeof bundleUrl !== 'string') {
       res.status(400).json({ success: false, message: 'URL do pacote inválida.' });
+      return;
+    }
+
+    // Validate trusted domain (Only official Supabase storage bucket allowed)
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(bundleUrl);
+    } catch {
+      res.status(400).json({ success: false, message: 'Formato de URL inválido.' });
+      return;
+    }
+
+    const isTrustedSupabase = parsedUrl.protocol === 'https:' && 
+      parsedUrl.hostname === 'trrewoowgbhyfceumrlt.supabase.co' &&
+      parsedUrl.pathname.startsWith('/storage/v1/object/public/updates/');
+
+    if (!isTrustedSupabase) {
+      res.status(403).json({ success: false, message: 'Origem de atualização não autorizada.' });
       return;
     }
 
@@ -771,27 +844,60 @@ router.post('/updates/apply', async (req: Request, res: Response): Promise<void>
 
     const tempZipPath = path.resolve(TEMP_DIR, `update-${Date.now()}.zip`);
 
-    // Download the zip archive
+    // Download the zip archive with timeout and early size limit check (max 100MB)
     const response = await fetch(bundleUrl);
     if (!response.ok) {
       res.status(400).json({ success: false, message: `Falha ao baixar pacote: ${response.statusText}` });
       return;
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+    if (contentLength > 100 * 1024 * 1024) {
+      res.status(400).json({ success: false, message: 'Tamanho de pacote excede o limite máximo permitido (100MB).' });
+      return;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > 100 * 1024 * 1024) {
+      res.status(400).json({ success: false, message: 'Tamanho de pacote excede o limite máximo permitido.' });
+      return;
+    }
+
+    const buffer = Buffer.from(arrayBuffer);
     fs.writeFileSync(tempZipPath, buffer);
 
-    // Extract to all targets
-    const { exec } = await import('child_process');
+    // Extract safely using spawn with parameterized arguments (no raw string interpolation)
+    const { spawn } = await import('child_process');
+    let extractedAtLeastOnce = false;
     for (const target of distTargets) {
       try {
         fs.mkdirSync(target, { recursive: true });
-        await new Promise<void>((resolve) => {
-          exec(`powershell -Command "Expand-Archive -Path '${tempZipPath}' -DestinationPath '${target}' -Force"`, () => {
-            resolve();
+        await new Promise<void>((resolve, reject) => {
+          const proc = spawn('powershell.exe', [
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
+            'Expand-Archive',
+            '-LiteralPath',
+            tempZipPath,
+            '-DestinationPath',
+            target,
+            '-Force'
+          ]);
+          proc.on('error', (err) => reject(err));
+          proc.on('close', (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(`Expand-Archive exited with code ${code}`));
           });
         });
-      } catch {}
+        extractedAtLeastOnce = true;
+      } catch (extractErr) {
+        console.warn(`Extraction to ${target} note:`, extractErr);
+      }
+    }
+
+    if (!extractedAtLeastOnce) {
+      throw new Error('Falha ao extrair os arquivos de atualização nos diretórios de destino.');
     }
 
     // Cleanup temp zip
