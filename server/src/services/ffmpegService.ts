@@ -213,37 +213,65 @@ function parseTimeString(timeStr: string): number {
 }
 
 /**
- * Renders MP4 with burned-in ASS subtitles
+ * Options for MP4 render jobs
+ */
+export interface RenderMp4Options {
+  presetPlatform?: 'instagram' | 'tiktok' | 'youtube' | 'custom';
+  optimize50MB?: boolean;
+}
+
+/**
+ * Renders MP4 with burned-in ASS subtitles (Preserving original resolution & aspect ratio)
  */
 export function renderMp4WithAss(
   inputVideoPath: string,
   assPath: string,
   outputPath: string,
   duration: number,
+  options: RenderMp4Options = {},
   onProgress?: (progress: { percent: number; currentSec: number; fps: number }) => void
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const escapedAss = escapeFilterPath(assPath);
-    const filterChain = `scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,ass='${escapedAss}'`;
+    // Direct subtitle burn-in preserving the video's original resolution (1920x1080 horizontal, 1080x1920 vertical, 4K, etc.)
+    const filterChain = `ass='${escapedAss}'`;
+
     const args = [
       '-y',
       '-i', inputVideoPath,
       '-vf', filterChain,
       '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '17', // Visually lossless mastering grade (perfeito para Reels/TikTok)
-      '-pix_fmt', 'yuv420p', // Formato universal de pixel exigido pelo Instagram/Meta
+      '-preset', 'fast'
+    ];
+
+    // Optional 50MB compression mode (for Instagram / TikTok without compression penalty)
+    if (options.optimize50MB) {
+      const targetMaxKbits = 45 * 8 * 1024; // 45 Megabytes in Kilobits
+      const safeBitrateKbps = duration > 0 ? Math.min(15000, Math.max(2500, Math.floor(targetMaxKbits / duration))) : 12000;
+      args.push(
+        '-b:v', `${safeBitrateKbps}k`,
+        '-maxrate', `${Math.round(safeBitrateKbps * 1.15)}k`,
+        '-bufsize', `${safeBitrateKbps * 2}k`
+      );
+    } else {
+      // Mastering grade high quality (CRF 17)
+      args.push('-crf', '17');
+    }
+
+    // Universal social standards (BT.709 color tags to prevent gamma shift + 48kHz 320k AAC + faststart)
+    args.push(
+      '-pix_fmt', 'yuv420p',
       '-profile:v', 'high',
       '-level', '4.2',
       '-colorspace', 'bt709',
       '-color_primaries', 'bt709',
       '-color_trc', 'bt709',
       '-c:a', 'aac',
-      '-b:a', '320k', // Áudio broadcast de 320 kbps
-      '-ar', '48000', // Taxa de amostragem de 48kHz
-      '-movflags', '+faststart', // MOOV atom no início para carregamento instantâneo no Instagram
+      '-b:a', '320k',
+      '-ar', '48000',
+      '-movflags', '+faststart',
       outputPath
-    ];
+    );
 
     const proc = spawn(FFMPEG_PATH, args);
     let stderr = '';

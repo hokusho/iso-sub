@@ -44,13 +44,21 @@ export interface SubtitleStyle {
   shadowBlur: number;
   shadowDistance: number;
   
-  // Background Box / Pill
+  // Background Box / Pill (Whole Block)
   useBackgroundBox: boolean;
   boxColor: string;
   boxOpacity: number; // 0 - 1
   boxPaddingX: number;
   boxPaddingY: number;
   boxRadius: number;
+  
+  // Word Highlight Box (Box behind active word)
+  useWordHighlightBox?: boolean;
+  wordHighlightBoxColor?: string;
+  wordHighlightBoxTextColor?: string;
+  wordHighlightBoxRadius?: number;
+  wordHighlightBoxPaddingX?: number;
+  wordHighlightBoxPaddingY?: number;
   
   // Position
   positionY: number; // 0 - 100 percentage from top (default ~75%)

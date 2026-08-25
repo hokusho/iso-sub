@@ -96,7 +96,7 @@ export const App: React.FC = () => {
   };
 
   // Sidebar Tab Navigation
-  const [activeTab, setActiveTab] = useState<'presets' | 'style' | 'words' | 'script'>('presets');
+  const [activeTab, setActiveTab] = useState<'style' | 'words' | 'script'>('style');
 
   // Modals
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
@@ -357,6 +357,15 @@ export const App: React.FC = () => {
       setMetadata(data.metadata);
       setWaveformPeaks(data.waveformPeaks || []);
       setDuration(data.metadata.duration || 10);
+
+      // Auto-detect Aspect Ratio from Video Metadata (Horizontal 16:9, Vertical 9:16, 1:1, 4:5)
+      if (data.metadata?.width && data.metadata?.height) {
+        const isHorizontal = data.metadata.width > data.metadata.height;
+        const detectedRatio: AspectRatio = data.metadata.aspectRatio === '16:9' || isHorizontal
+          ? '16:9'
+          : (data.metadata.aspectRatio === '1:1' ? '1:1' : (data.metadata.aspectRatio === '4:5' ? '4:5' : '9:16'));
+        setAspectRatio(detectedRatio);
+      }
 
       addToast('info', 'Vídeo carregado', `${data.metadata.width}x${data.metadata.height} (${data.metadata.duration.toFixed(1)}s)`);
 
@@ -1071,18 +1080,6 @@ export const App: React.FC = () => {
           {/* Tab Navigation Header */}
           <div className="flex items-center border-b border-neutral-300 bg-neutral-100 p-2.5 gap-2 shrink-0">
             <button
-              onClick={() => setActiveTab('presets')}
-              className={`flex-1 py-2.5 text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 transition ${
-                activeTab === 'presets'
-                  ? 'bg-neutral-900 text-white shadow-sm'
-                  : 'text-neutral-700 hover:text-black hover:bg-neutral-200'
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Presets</span>
-            </button>
-
-            <button
               onClick={() => setActiveTab('style')}
               className={`flex-1 py-2.5 text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 transition ${
                 activeTab === 'style'
@@ -1121,17 +1118,12 @@ export const App: React.FC = () => {
 
           {/* Tab Content Panel */}
           <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-[#eeeeee]">
-            {activeTab === 'presets' && (
-              <PresetPicker currentStyle={style} onSelectPreset={handleSelectPreset} />
-            )}
-
             {activeTab === 'style' && (
               <div className="flex flex-col gap-4">
+                <PresetPicker currentStyle={style} onSelectPreset={handleSelectPreset} />
                 <PositionControls
                   style={style}
-                  blocks={blocks}
                   onChange={(u) => setStyle((s) => ({ ...s, ...u }))}
-                  onApplyRechunk={(newBlocks) => setBlocks(newBlocks)}
                 />
                 <TypographyColorControls
                   style={style}
@@ -1157,6 +1149,8 @@ export const App: React.FC = () => {
                 onDeleteBlock={handleDeleteBlock}
                 onDeleteWord={handleDeleteWord}
                 onAddWord={handleAddWord}
+                onApplyBlocks={setBlocks}
+                onStyleChange={(u) => setStyle((s) => ({ ...s, ...u }))}
                 onSeek={seek}
               />
             )}

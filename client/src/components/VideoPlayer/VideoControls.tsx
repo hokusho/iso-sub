@@ -23,14 +23,14 @@ interface VideoControlsProps {
   volume: number;
   isMuted: boolean;
   playbackRate: number;
-  aspectRatio: AspectRatio;
+  aspectRatio?: AspectRatio;
   safeZoneMode: SafeZoneMode;
   onTogglePlay: () => void;
   onSeek: (time: number) => void;
   onVolumeChange: (vol: number) => void;
   onToggleMute: () => void;
   onPlaybackRateChange: (rate: number) => void;
-  onAspectRatioChange: (ratio: AspectRatio) => void;
+  onAspectRatioChange?: (ratio: AspectRatio) => void;
   onSafeZoneChange: (mode: SafeZoneMode) => void;
   onToggleFullscreen: () => void;
 }
@@ -54,7 +54,6 @@ export const VideoControls: React.FC<VideoControlsProps> = ({
   onToggleFullscreen
 }) => {
   const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
-  const aspectRatios: AspectRatio[] = ['9:16', '16:9', '1:1', '4:5'];
 
   const [isSafeZoneDropdownOpen, setIsSafeZoneDropdownOpen] = useState(false);
   const safeZoneRef = useRef<HTMLDivElement | null>(null);
@@ -165,23 +164,13 @@ export const VideoControls: React.FC<VideoControlsProps> = ({
               className="w-16 h-1.5 bg-neutral-300 cursor-pointer accent-neutral-900"
             />
           </div>
-        </div>
-
-        {/* Center: Aspect Ratio Toggle */}
-        <div className="flex items-center bg-neutral-100 p-1 rounded-xl border border-neutral-300 gap-1">
-          {aspectRatios.map((ratio) => (
-            <button
-              key={ratio}
-              onClick={() => onAspectRatioChange(ratio)}
-              className={`px-2.5 py-1 text-xs font-black rounded-lg transition ${
-                aspectRatio === ratio
-                  ? 'bg-neutral-900 text-white shadow-sm'
-                  : 'text-neutral-700 hover:text-neutral-900 hover:bg-neutral-200'
-              }`}
-            >
-              {ratio}
-            </button>
-          ))}
+          {/* Safe Zone Quick Indicator */}
+          {aspectRatio && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-neutral-100 rounded-xl border border-neutral-300 text-xs font-mono font-bold text-neutral-600">
+              <Sparkles className="w-3.5 h-3.5 text-neutral-800" />
+              <span>{aspectRatio === '16:9' ? 'Horizontal (16:9)' : (aspectRatio === '9:16' ? 'Vertical (9:16)' : aspectRatio)}</span>
+            </div>
+          )}
         </div>
 
         {/* Right: Speed, Safezone 4-Option Dropdown & Fullscreen */}

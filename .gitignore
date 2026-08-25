@@ -59,3 +59,8 @@ admin/
 license-server/
 licenses.json
 server/storage/licenses.json
+
+# Local Architecture Documentation (Private AI agent specs)
+architecture-docs/
+architecture/
+
