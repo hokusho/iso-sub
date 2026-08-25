@@ -243,16 +243,18 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
             <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-lg border border-neutral-300 shadow-sm">
               <button
                 type="button"
-                onClick={() => onChange({ fontSize: Math.max(10, (style.fontSize || 44) - 2) })}
-                className="w-4 h-4 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-xs"
+                onClick={() => onChange({ fontSize: Math.max(10, (style.fontSize || 20) - 1) })}
+                className="w-4 h-4 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-xs cursor-pointer"
+                title="Diminuir 1px"
               >
                 −
               </button>
               <span className="text-xs font-mono font-black text-neutral-900 px-1">{style.fontSize}px</span>
               <button
                 type="button"
-                onClick={() => onChange({ fontSize: Math.min(96, (style.fontSize || 44) + 2) })}
-                className="w-4 h-4 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-xs"
+                onClick={() => onChange({ fontSize: Math.min(96, (style.fontSize || 20) + 1) })}
+                className="w-4 h-4 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-xs cursor-pointer"
+                title="Aumentar 1px"
               >
                 +
               </button>

@@ -45,7 +45,7 @@ export const PresetPicker: React.FC<PresetPickerProps> = ({
               <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-black text-neutral-900">
-                    {preset.previewBadge} {preset.name}
+                    {preset.name}
                   </span>
                 </div>
 

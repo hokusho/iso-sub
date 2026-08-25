@@ -866,28 +866,29 @@ router.post('/updates/apply', async (req: Request, res: Response): Promise<void>
     const buffer = Buffer.from(arrayBuffer);
     fs.writeFileSync(tempZipPath, buffer);
 
-    // Extract safely using spawn with parameterized arguments (no raw string interpolation)
+    // Extract safely using spawn with properly quoted paths for spaces
     const { spawn } = await import('child_process');
     let extractedAtLeastOnce = false;
     for (const target of distTargets) {
       try {
         fs.mkdirSync(target, { recursive: true });
+        const escapedZip = tempZipPath.replace(/'/g, "''");
+        const escapedTarget = target.replace(/'/g, "''");
+        const psCommand = `Expand-Archive -LiteralPath '${escapedZip}' -DestinationPath '${escapedTarget}' -Force`;
+
         await new Promise<void>((resolve, reject) => {
           const proc = spawn('powershell.exe', [
             '-NoProfile',
             '-NonInteractive',
             '-Command',
-            'Expand-Archive',
-            '-LiteralPath',
-            tempZipPath,
-            '-DestinationPath',
-            target,
-            '-Force'
+            psCommand
           ]);
+          let stderr = '';
+          proc.stderr?.on('data', (d) => { stderr += d.toString(); });
           proc.on('error', (err) => reject(err));
           proc.on('close', (code) => {
             if (code === 0) resolve();
-            else reject(new Error(`Expand-Archive exited with code ${code}`));
+            else reject(new Error(`Expand-Archive exited with code ${code}: ${stderr}`));
           });
         });
         extractedAtLeastOnce = true;

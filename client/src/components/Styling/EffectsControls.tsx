@@ -17,7 +17,7 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
   const handleToggleStroke = (checked: boolean) => {
     if (checked) {
       onChange({
-        strokeWidth: (style.strokeWidth && style.strokeWidth > 0) ? style.strokeWidth : 8,
+        strokeWidth: (style.strokeWidth && style.strokeWidth > 0) ? style.strokeWidth : 3,
         strokeColor: style.strokeColor || '#000000'
       });
     } else {
@@ -329,20 +329,20 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
           )}
         </div>
 
-        {/* 5. Sub Card: Caixa Destaque na Palavra (Word Highlight Box) */}
+        {/* 5. Sub Card: Caixa Destaque (Word Highlight Box) */}
         <div className={`flex flex-col gap-2.5 p-3 rounded-xl border-2 transition ${
           style.useWordHighlightBox ? 'bg-neutral-100 border-neutral-300' : 'bg-neutral-50/80 border-neutral-200'
         }`}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
-              <span className="text-xs font-black text-neutral-900">Caixa Destaque na Palavra</span>
+              <span className="text-xs font-black text-neutral-900">Caixa Destaque</span>
               <button
                 type="button"
                 onClick={() => {
                   const nextVal = !style.useWordHighlightBox;
                   onChange({
                     useWordHighlightBox: nextVal,
-                    ...(nextVal ? { animationType: 'none' } : {})
+                    ...(nextVal ? { wordHighlightBoxColor: style.wordHighlightBoxColor || '#A855F7' } : {})
                   });
                 }}
                 className={`w-9 h-5 rounded-full p-0.5 transition-colors shrink-0 flex items-center cursor-pointer shadow-inner ${
@@ -361,10 +361,10 @@ export const EffectsControls: React.FC<EffectsControlsProps> = ({ style, onChang
             {style.useWordHighlightBox && (
               <div className="shrink-0">
                 <ColorPickerPopover
-                  color={style.wordHighlightBoxColor || style.highlightColor || '#7C3AED'}
+                  color={style.wordHighlightBoxColor || '#A855F7'}
                   label="Caixa Destaque"
                   align="right"
-                  onChange={(c) => onChange({ wordHighlightBoxColor: c, highlightColor: c })}
+                  onChange={(c) => onChange({ wordHighlightBoxColor: c })}
                 />
               </div>
             )}

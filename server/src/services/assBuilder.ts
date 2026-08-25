@@ -223,7 +223,7 @@ export function buildAssSubtitle(options: AssBuilderOptions): string {
 
   const primaryColorAss = hexToAssColor(style.textColor || '#FFFFFF', 0);
   const highlightColorAss = hexToAssColor(style.highlightColor || '#FFE600', 0);
-  const wordBoxColorAss = hexToAssColor(style.wordHighlightBoxColor || style.highlightColor || '#7C3AED', 0);
+  const wordBoxColorAss = hexToAssColor(style.wordHighlightBoxColor || '#A855F7', 0);
   
   const hasStroke = (style.strokeWidth && style.strokeWidth > 0);
   const outlineColorAss = hasStroke
@@ -378,7 +378,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     }
 
     // Word-by-word animations (Pop, Bounce, Karaoke, Color Change, Word Box)
-    const wordBoxColorAss = hexToAssColor(style.wordHighlightBoxColor || style.highlightColor || '#7C3AED');
+    const wordBoxColorAss = hexToAssColor(style.wordHighlightBoxColor || '#A855F7');
     const wordBoxTextColorAss = hexToAssColor(style.wordHighlightBoxTextColor || '#FFFFFF');
 
     for (let i = 0; i < formattedWords.length; i++) {

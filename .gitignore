@@ -17,16 +17,13 @@ src-tauri/target/
 .vite/
 
 # Temporary and upload storage (keeps project ultra-lightweight)
-server/storage/uploads/*
+storage/
+*/storage/
+server/storage/*
+!server/storage/.gitkeep
 !server/storage/uploads/.gitkeep
-
-server/storage/renders/*
 !server/storage/renders/.gitkeep
-
-server/storage/temp/*
 !server/storage/temp/.gitkeep
-
-server/storage/fonts/*
 !server/storage/fonts/.gitkeep
 
 # Environment variables
@@ -68,5 +65,6 @@ server/storage/licenses.json
 # Runtime settings with secrets (NEVER commit - contains API keys/serials)
 server/storage/user_settings.json
 
-# Audit report
+# Audit report and database scripts
 AUDITORIA.md
+*.sql

@@ -159,10 +159,9 @@ export const App: React.FC = () => {
     };
     syncSettings();
   }, []);
-  // Synchronize Window Title with the current active version dynamically
+  // Synchronize Window Title dynamically
   useEffect(() => {
-    const ver = getActiveAppVersion();
-    const titleText = `ISO SUB v${ver} | Editor e Renderizador de Legendas`;
+    const titleText = 'ISO SUB | Editor e Renderizador de Legendas';
     document.title = titleText;
 
     // Direct Tauri v2 Window Title API bridge
@@ -789,6 +788,14 @@ export const App: React.FC = () => {
         shadowColor: pStyle.shadowColor || prev.shadowColor,
         boxColor: pStyle.boxColor || prev.boxColor,
 
+        // Destaque e Caixa Destaque
+        useHighlight: pStyle.useHighlight ?? prev.useHighlight,
+        useWordHighlightBox: pStyle.useWordHighlightBox ?? false,
+        wordHighlightBoxColor: pStyle.wordHighlightBoxColor || prev.wordHighlightBoxColor || '#A855F7',
+        wordHighlightBoxRadius: pStyle.wordHighlightBoxRadius ?? prev.wordHighlightBoxRadius ?? 6,
+        wordHighlightBoxPaddingX: pStyle.wordHighlightBoxPaddingX ?? prev.wordHighlightBoxPaddingX ?? 6,
+        wordHighlightBoxPaddingY: pStyle.wordHighlightBoxPaddingY ?? prev.wordHighlightBoxPaddingY ?? 2,
+
         // Efeitos e animações do preset selecionado
         animationType: pStyle.animationType ?? prev.animationType,
         animationScale: pStyle.animationScale ?? prev.animationScale,
@@ -1322,16 +1329,21 @@ export const App: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setIsUpdateModalOpen(true)}
-                      title={`Nova versão ${updateInfo.latestVersion} disponível! Clique para atualizar.`}
+                      title={`Nova versão ${updateInfo.latestVersion} disponível! Clique para ver as novidades.`}
                       className="text-[9.5px] font-mono font-black text-red-600 hover:text-red-700 underline underline-offset-2 animate-pulse cursor-pointer transition flex items-center gap-1"
                     >
                       <span>v{getActiveAppVersion()} (v{updateInfo.latestVersion} disponível)</span>
                     </button>
                   </>
                 ) : (
-                  <span className="text-[9.5px] font-mono font-bold text-neutral-400">
+                  <button
+                    type="button"
+                    onClick={() => setIsUpdateModalOpen(true)}
+                    title="Clique para ver os detalhes e notas da versão atual"
+                    className="text-[9.5px] font-mono font-bold text-neutral-400 hover:text-neutral-700 underline underline-offset-2 cursor-pointer transition"
+                  >
                     v{getActiveAppVersion()}
-                  </span>
+                  </button>
                 )}
               </div>
             </div>

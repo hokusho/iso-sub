@@ -70,7 +70,7 @@ export const PositionControls: React.FC<PositionControlsProps> = ({
           <div className="grid grid-cols-4 gap-1">
             {[
               { label: 'Base', val: 82 },
-              { label: '⭐ TikTok', val: 72 },
+              { label: 'Seguro', val: 72 },
               { label: 'Centro', val: 50 },
               { label: 'Topo', val: 18 }
             ].map((q) => (
