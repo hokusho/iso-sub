@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Play,
   Trash2,
@@ -9,11 +9,22 @@ import {
   ChevronRight,
   Type,
   Eye,
-  EyeOff
+  EyeOff,
+  RefreshCw,
+  Check,
+  FileText,
+  Sparkles,
+  LayoutGrid
 } from 'lucide-react';
 import { SubtitleBlock, SubtitleWord, SubtitleStyle } from '../../types';
 import { formatTimecode } from '../../utils/timeFormat';
 import { v4 as uuidv4 } from 'uuid';
+
+import {
+  recalculateBlocksFromFullText,
+  findOptimalSplitIndex,
+  countSignificantWords
+} from '../../utils/textChunker';
 
 interface WordEditorProps {
   blocks: SubtitleBlock[];
@@ -27,6 +38,8 @@ interface WordEditorProps {
   onDeleteBlock: (blockId: string) => void;
   onDeleteWord: (blockId: string, wordId: string) => void;
   onAddWord: (blockId: string) => void;
+  onApplyBlocks?: (newBlocks: SubtitleBlock[]) => void;
+  onStyleChange?: (updated: Partial<SubtitleStyle>) => void;
   onSeek: (time: number) => void;
 }
 
@@ -42,10 +55,64 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   onDeleteBlock,
   onDeleteWord,
   onAddWord,
+  onApplyBlocks,
+  onStyleChange,
   onSeek
 }) => {
   const [expandedBlocks, setExpandedBlocks] = useState<Record<string, boolean>>({});
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Line & Word density controls
+  const currentLines = style?.maxLines ?? 2;
+  const currentWordsPerLine = style?.wordsPerLine || 4;
+  const [breakOnPunctuation, setBreakOnPunctuation] = useState<boolean>(true);
+
+  // Full Text Card State & Synchronization
+  const [fullText, setFullText] = useState<string>('');
+  const [isFullTextExpanded, setIsFullTextExpanded] = useState<boolean>(true);
+  const [justRecalculated, setJustRecalculated] = useState<boolean>(false);
+
+  // Compute the canonical text from blocks
+  const canonicalText = blocks.map(b => b.text.trim()).filter(Boolean).join('\n');
+
+  // Sync fullText whenever individual blocks change from above
+  useEffect(() => {
+    setFullText(canonicalText);
+  }, [canonicalText]);
+
+  const hasPendingTextChanges = fullText.trim() !== canonicalText.trim();
+
+  const handleRecalculate = (
+    words: number = currentWordsPerLine,
+    lines: number = currentLines,
+    usePunct: boolean = breakOnPunctuation
+  ) => {
+    if (!onApplyBlocks || blocks.length === 0) return;
+    const recalculated = recalculateBlocksFromFullText(fullText, blocks, words, lines, usePunct);
+    onApplyBlocks(recalculated);
+    setJustRecalculated(true);
+    setTimeout(() => setJustRecalculated(false), 2500);
+  };
+
+  const handleSelectLines = (lines: 1 | 2) => {
+    onStyleChange?.({ maxLines: lines });
+    handleRecalculate(currentWordsPerLine, lines, breakOnPunctuation);
+  };
+
+  const handleSelectWordsPerLine = (words: number) => {
+    onStyleChange?.({ wordsPerLine: words });
+    handleRecalculate(words, currentLines, breakOnPunctuation);
+  };
+
+  const handleTogglePunctuation = () => {
+    const newVal = !breakOnPunctuation;
+    setBreakOnPunctuation(newVal);
+    handleRecalculate(currentWordsPerLine, currentLines, newVal);
+  };
+
+  const handleResetFullText = () => {
+    setFullText(canonicalText);
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
@@ -292,15 +359,229 @@ export const WordEditor: React.FC<WordEditorProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-3.5 overflow-y-auto max-h-[600px] p-1.5 select-none">
-      {blocks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-8 text-center bg-white rounded-2xl border-2 border-neutral-300">
-          <Type className="w-10 h-10 text-neutral-500 mb-2" />
-          <p className="text-base font-black text-neutral-900">Nenhuma legenda encontrada.</p>
-          <p className="text-xs text-neutral-600 mt-1 font-bold">Gere a transcrição ou adicione um novo bloco na timeline.</p>
+    <div className="flex flex-col gap-3.5 w-full select-none pb-2">
+      {/* 1. CARD DO TEXTO COMPLETO (REVISÃO & PONTUAÇÃO INTELIGENTE) */}
+      {blocks.length > 0 && (
+        <div className="flex flex-col p-3.5 bg-white rounded-2xl border-2 border-neutral-300 shadow-sm gap-2.5">
+          {/* Header do Card */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-neutral-900 uppercase tracking-wider">
+                Texto Completo & Pontuação
+              </span>
+              <span className="text-[10px] font-mono font-bold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
+                {blocks.length} {blocks.length === 1 ? 'linha' : 'linhas'} • {blocks.reduce((s, b) => s + (b.words?.length || 0), 0)} palavras
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsFullTextExpanded(!isFullTextExpanded)}
+              className="text-xs font-bold text-neutral-700 hover:text-neutral-950 flex items-center gap-1 cursor-pointer bg-neutral-50 hover:bg-neutral-100 px-2.5 py-1 rounded-lg border border-neutral-300 transition shadow-2xs"
+            >
+              {isFullTextExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              <span>{isFullTextExpanded ? 'Recolher' : 'Expandir'}</span>
+            </button>
+          </div>
+
+          {isFullTextExpanded && (
+            <div className="flex flex-col gap-2 pt-1 border-t border-neutral-200">
+              <p className="text-[11px] text-neutral-600 leading-relaxed font-medium">
+                Edite acentuações, vírgulas e pontos linha por linha. Ao terminar, clique no botão para <strong>recalcular e reorganizar as legendas</strong>.
+              </p>
+
+              {/* Textarea do Texto Completo */}
+              <div className="relative">
+                <textarea
+                  value={fullText}
+                  onChange={(e) => setFullText(e.target.value)}
+                  rows={Math.min(8, Math.max(3, fullText.split('\n').length))}
+                  placeholder="Digite ou edite o texto completo linha por linha..."
+                  className="w-full p-3 text-xs font-mono font-bold text-neutral-900 bg-neutral-50 border-2 border-neutral-300 focus:border-neutral-900 focus:bg-white focus:ring-1 focus:ring-neutral-900 rounded-xl leading-relaxed resize-y shadow-inner outline-none transition"
+                />
+              </div>
+
+              {/* Ações: Status + Botão Recalcular */}
+              <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                {hasPendingTextChanges ? (
+                  <span className="text-[11px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-2 py-1 rounded-lg flex items-center gap-1.5 animate-pulse">
+                    ⚠️ Alterações pendentes
+                  </span>
+                ) : justRecalculated ? (
+                  <span className="text-[11px] font-black text-emerald-900 bg-emerald-100 border border-emerald-300 px-2 py-1 rounded-lg flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-700" /> Legendas recalculadas!
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-neutral-500 font-medium">
+                    Sincronizado com os blocos abaixo
+                  </span>
+                )}
+
+                <div className="flex items-center gap-1.5 ml-auto">
+                  {hasPendingTextChanges && (
+                    <button
+                      type="button"
+                      onClick={handleResetFullText}
+                      className="px-2.5 py-1.5 text-xs font-bold text-neutral-700 bg-white hover:bg-neutral-100 border border-neutral-300 rounded-lg transition cursor-pointer"
+                      title="Descartar mudanças e restaurar texto dos blocos"
+                    >
+                      Desfazer
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleRecalculate()}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-black rounded-lg transition cursor-pointer shadow-sm bg-neutral-900 text-white hover:bg-black ring-2 ring-neutral-900/30 active:scale-95"
+                    title="Recalcular e reorganizar legendas com base na pontuação e linhas"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${hasPendingTextChanges ? 'animate-spin-once' : ''}`} />
+                    <span>Recalcular Legendas</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        blocks.map((block, idx) => {
+      )}
+
+      {/* 2. CARD DE CONFIGURAÇÃO DE DIVISÃO & DENSIDADE DE PALAVRAS */}
+      {blocks.length > 0 && (
+        <div className="flex flex-col gap-2.5 bg-white p-3.5 rounded-2xl border-2 border-neutral-300 shadow-sm">
+          {/* Linhas na Tela */}
+          <div className="flex items-center justify-between border-b border-neutral-100 pb-2 flex-wrap gap-2">
+            <div className="flex items-center gap-1.5">
+              <LayoutGrid className="w-4 h-4 text-neutral-900" />
+              <span className="text-xs font-black text-neutral-900">Linhas na Tela:</span>
+            </div>
+            <div className="flex items-center bg-neutral-100 p-1 rounded-xl border border-neutral-300 gap-1 shadow-inner">
+              <button
+                type="button"
+                onClick={() => handleSelectLines(1)}
+                className={`px-3 py-1 text-xs font-black rounded-lg transition cursor-pointer ${
+                  currentLines === 1
+                    ? 'bg-neutral-900 text-white shadow-sm ring-1 ring-neutral-900'
+                    : 'text-neutral-700 hover:bg-neutral-200'
+                }`}
+              >
+                1 Linha
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectLines(2)}
+                className={`px-3 py-1 text-xs font-black rounded-lg transition cursor-pointer ${
+                  currentLines === 2
+                    ? 'bg-neutral-900 text-white shadow-sm ring-1 ring-neutral-900'
+                    : 'text-neutral-700 hover:bg-neutral-200'
+                }`}
+              >
+                2 Linhas
+              </button>
+            </div>
+          </div>
+
+          {/* Palavras por Linha */}
+          <div className="flex items-center justify-between w-full flex-wrap gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-black text-neutral-900">
+                {currentLines === 2 ? 'Palavras por Linha (2 Linhas):' : 'Palavras por Bloco (1 Linha):'}
+              </span>
+            </div>
+            <div className="flex items-center bg-neutral-100 p-1 rounded-xl border border-neutral-300 gap-1 shadow-inner">
+              {[
+                { words: 1, label: '1 Palavra' },
+                { words: 2, label: '2 Palavras' },
+                { words: 3, label: '3 Palavras' },
+                { words: 4, label: '4 Palavras' },
+                { words: 5, label: '5 Palavras' }
+              ].map((item) => {
+                const isActive = currentWordsPerLine === item.words;
+                return (
+                  <button
+                    key={item.words}
+                    type="button"
+                    onClick={() => handleSelectWordsPerLine(item.words)}
+                    className={`px-2 py-1 text-xs font-black rounded-lg transition transform active:scale-95 flex items-center justify-center cursor-pointer ${
+                      isActive
+                        ? 'bg-neutral-900 text-white shadow-sm ring-1 ring-neutral-900'
+                        : 'text-neutral-800 hover:bg-neutral-200'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quebra Inteligente por Pontuação */}
+          <div className="flex items-center justify-between bg-neutral-50 p-2.5 rounded-xl border border-neutral-200 mt-0.5">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-neutral-900 text-white flex items-center justify-center text-xs font-black font-mono shadow-xs">
+                . ,
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-black text-neutral-900 flex items-center gap-1.5">
+                  <span>Quebra Inteligente por Pontuação</span>
+                  <span className="text-[10px] font-bold font-mono bg-white text-neutral-700 px-1.5 py-0.2 rounded border border-neutral-300">
+                    . , ? ! …
+                  </span>
+                </span>
+                <span className="text-[10px] text-neutral-600 font-medium">
+                  Pula para a próxima linha ou bloco ao encontrar pontos e vírgulas.
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleTogglePunctuation}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition active:scale-95 cursor-pointer ${
+                breakOnPunctuation
+                  ? 'bg-neutral-900 text-white shadow-sm'
+                  : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'
+              }`}
+            >
+              {breakOnPunctuation && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+              <span>{breakOnPunctuation ? 'Ativado' : 'Desativado'}</span>
+            </button>
+          </div>
+
+          {/* Subtexto explicativo dinâmico */}
+          <p className="text-[11px] text-neutral-600 font-bold border-t border-neutral-200/80 pt-1.5 flex items-center justify-between">
+            <span>
+              {currentLines === 2
+                ? `2 linhas na tela com ${currentWordsPerLine} palavras em cada linha (respeitando pontos e vírgulas).`
+                : `1 linha na tela com ${currentWordsPerLine} palavras por bloco (respeitando pontos e vírgulas).`}
+            </span>
+          </p>
+        </div>
+      )}
+
+      {/* 3. CARD PRINCIPAL: LEGENDAS POR LINHA */}
+      <div className="flex flex-col p-3.5 bg-white rounded-2xl border-2 border-neutral-300 shadow-sm gap-3">
+        {/* Header do Card das Linhas */}
+        <div className="flex items-center justify-between border-b-2 border-neutral-100 pb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-neutral-900 uppercase tracking-wider">
+              Legendas por Linha
+            </span>
+            <span className="text-[10px] font-mono font-bold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
+              {blocks.length} {blocks.length === 1 ? 'bloco' : 'blocos'}
+            </span>
+          </div>
+        </div>
+
+        {/* Lista de Sub-cards das Linhas */}
+        <div className="flex flex-col gap-2.5">
+          {blocks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center bg-neutral-50 rounded-xl border-2 border-neutral-200">
+              <Type className="w-10 h-10 text-neutral-400 mb-2" />
+              <p className="text-sm font-black text-neutral-900">Nenhuma legenda encontrada.</p>
+              <p className="text-xs text-neutral-500 mt-1 font-bold">Gere a transcrição ou digite no texto acima.</p>
+            </div>
+          ) : (
+            blocks.map((block, idx) => {
           const isActive = currentTime >= block.start && currentTime <= block.end;
           const isSelected = selectedBlockId === block.id;
           const isExpanded = !!expandedBlocks[block.id];
@@ -312,20 +593,9 @@ export const WordEditor: React.FC<WordEditorProps> = ({
           );
 
           // Compute 1-line vs 2-line layout
-          const targetWordsPerLine = style?.wordsPerLine || 3;
-          const isMultiline = (style?.maxLines === 2 && block.words.length > targetWordsPerLine) || (block.words.length >= 6);
-
-          let splitIndex = targetWordsPerLine;
-          if (isMultiline && block.words.length > targetWordsPerLine) {
-            if (block.words.length === 4 && targetWordsPerLine === 3) {
-              splitIndex = 2;
-            }
-            const punctIdx = block.words.findIndex((w, i) => i >= 0 && i < block.words.length - 1 && /[,.?!…:;]$/.test(w.text.trim()));
-            if (punctIdx !== -1 && punctIdx + 1 <= targetWordsPerLine) {
-              splitIndex = punctIdx + 1;
-            }
-          }
-          splitIndex = isMultiline ? Math.min(block.words.length - 1, Math.max(1, splitIndex)) : block.words.length;
+          const targetWordsPerLine = style?.wordsPerLine || 4;
+          const splitIndex = style?.maxLines === 2 ? findOptimalSplitIndex(block.words, targetWordsPerLine) : block.words.length;
+          const isMultiline = style?.maxLines === 2 && splitIndex < block.words.length;
 
           const line1Words = block.words.slice(0, splitIndex);
           const line2Words = isMultiline ? block.words.slice(splitIndex) : [];
@@ -712,6 +982,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({
           );
         })
       )}
+        </div>
+      </div>
     </div>
   );
 };

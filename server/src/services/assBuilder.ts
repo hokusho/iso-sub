@@ -132,15 +132,94 @@ function sanitizeBlocksForAss(rawBlocks: SubtitleBlock[]): SubtitleBlock[] {
 }
 
 /**
- * Builds high-fidelity ASS subtitle file matching Canvas Preview 1:1 in Full HD 1080x1920 space
+ * Builds high-fidelity ASS subtitle file matching Canvas Preview 1:1 in video's native coordinate space
  */
+/**
+ * Estimates text width in pixels for standard bold sans-serif fonts (e.g. Montserrat, Inter, Roboto, Anton)
+ */
+function estimateTextWidth(text: string, fontSize: number, letterSpacing: number = 0): number {
+  let width = 0;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === ' ') {
+      width += fontSize * 0.32;
+    } else if (/[WMwm@%#]/.test(char)) {
+      width += fontSize * 0.88;
+    } else if (/[Iil1!|jtrf,.:;']/.test(char)) {
+      width += fontSize * 0.32;
+    } else if (/[A-Z0-9]/.test(char)) {
+      width += fontSize * 0.65;
+    } else {
+      width += fontSize * 0.54;
+    }
+    width += letterSpacing;
+  }
+  return width;
+}
+
+function isSignificantWord(wordText: string): boolean {
+  if (!wordText) return false;
+  const clean = wordText.trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  if (!clean) return false;
+  return clean.length > 2;
+}
+
+function countSignificantWords(words: { text: string }[]): number {
+  return words.filter(w => isSignificantWord(w.text)).length;
+}
+
+function findOptimalSplitIndex(words: { text: string }[], targetWordsPerLine: number = 4): number {
+  if (!words || words.length <= 3) return words ? words.length : 0;
+  const totalWords = words.length;
+
+  const commaIndices: number[] = [];
+  words.forEach((w, idx) => {
+    if (idx >= 1 && idx < totalWords - 1 && /[,;]$/.test(w.text.trim())) {
+      commaIndices.push(idx + 1);
+    }
+  });
+
+  const maxAllowedPerLine = Math.max(3, targetWordsPerLine + 1);
+  for (const splitIdx of commaIndices) {
+    const l1Count = splitIdx;
+    const l2Count = totalWords - splitIdx;
+    if (l1Count <= maxAllowedPerLine && l2Count <= maxAllowedPerLine && l1Count >= 1 && l2Count >= 1) {
+      return splitIdx;
+    }
+  }
+
+  let bestSplit = Math.max(1, Math.ceil(totalWords / 2));
+  let bestScore = Infinity;
+
+  for (let i = 1; i < totalWords; i++) {
+    const l1Words = words.slice(0, i);
+    const l2Words = words.slice(i);
+    const l1Len = l1Words.map(w => w.text).join(' ').length;
+    const l2Len = l2Words.map(w => w.text).join(' ').length;
+
+    const wordDiff = Math.abs(l1Words.length - l2Words.length);
+    const charDiff = Math.abs(l1Len - l2Len) / 10;
+
+    const overflowPenalty = (l1Words.length > targetWordsPerLine ? (l1Words.length - targetWordsPerLine) * 50 : 0) +
+                           (l2Words.length > targetWordsPerLine ? (l2Words.length - targetWordsPerLine) * 50 : 0);
+
+    const score = wordDiff + charDiff + overflowPenalty;
+    if (score < bestScore) {
+      bestScore = score;
+      bestSplit = i;
+    }
+  }
+
+  return Math.min(totalWords - 1, Math.max(1, bestSplit));
+}
+
 export function buildAssSubtitle(options: AssBuilderOptions): string {
-  const { blocks: rawBlocks, style } = options;
+  const { blocks: rawBlocks, style, width = 1080, height = 1920 } = options;
   const blocks = sanitizeBlocksForAss(rawBlocks);
 
-  // Fixed 1080x1920 Full HD Canvas coordinate space (matching CanvasPreview.tsx 1:1)
-  const virtualWidth = 1080;
-  const virtualHeight = 1920;
+  // Dynamic Canvas coordinate space matching the actual video resolution (e.g. 1920x1080 horizontal or 1080x1920 vertical)
+  const virtualWidth = width || 1080;
+  const virtualHeight = height || (virtualWidth === 1920 ? 1080 : 1920);
 
   const primaryColorAss = hexToAssColor(style.textColor || '#FFFFFF', 0);
   const highlightColorAss = hexToAssColor(style.highlightColor || '#FFE600', 0);
@@ -155,16 +234,22 @@ export function buildAssSubtitle(options: AssBuilderOptions): string {
     ? hexToAssColor(style.shadowColor || '#000000', 0)
     : '&HFF000000&';
 
-  const strokeAss = hasStroke ? Math.round((style.strokeWidth || 8) * 1.5) : 0;
-  const shadowAss = hasShadow ? Math.max(1, Math.round((style.shadowDistance || 3) * 1.5)) : 0;
-  const blurAss = (style.shadowBlur && style.shadowBlur > 0) ? Math.min(6, Math.round(style.shadowBlur)) : 0;
+  // Dynamic scale factor matching CanvasPreview.tsx
+  const scaleFactor = (virtualHeight / 1920) * 2;
+  const strokeAss = hasStroke ? Math.round((style.strokeWidth || 8) * (scaleFactor * 0.75)) : 0;
+  const shadowDistAss = Math.max(1, Math.round((style.shadowDistance ?? 4) * (scaleFactor * 0.75)));
   
-  // Font Size scaled 1:1 with Canvas Preview (base 1080p x 2)
-  const fontSizeAss = Math.round((style.fontSize || 54) * 2);
-
   // Calculate target positions
   const posX = Math.round(((style.positionX ?? 50) / 100) * virtualWidth);
   const posY = Math.round(((style.positionY ?? 72) / 100) * virtualHeight);
+
+  // Safe blur bound between 0 and 12px
+  const safeBlur = Math.min(12, Math.max(0, style.shadowBlur ?? 0));
+  const blurAssVal = safeBlur > 0 ? (safeBlur * 0.6).toFixed(1) : '0';
+  const shadowPosY = posY + shadowDistAss;
+
+  // Font Size scaled 1:1 with Canvas Preview
+  const fontSizeAss = Math.round((style.fontSize || 44) * scaleFactor);
 
   // Font Family & Bold setting
   const fontName = style.fontFamily || 'Montserrat';
@@ -173,14 +258,13 @@ export function buildAssSubtitle(options: AssBuilderOptions): string {
     : (style.fontWeight === 'bold' || style.fontWeight === 'extrabold' || style.fontWeight === 'black' || !style.fontWeight);
   const boldVal = isBold ? -1 : 0;
 
-  // Alignment: \an5 = Center middle, \an4 = Left middle, \an6 = Right middle
-  let anCode = 5;
-  if (style.alignment === 'left') anCode = 4;
-  if (style.alignment === 'right') anCode = 6;
+  // Alignment: \an5 = Center middle
+  const anCode = 5;
 
   // Build ASS Header with PlayRes matching Canvas Preview coordinate space
+  // 2-Layer Subtitle Architecture: Layer 0 for customizable soft shadow, Layer 1 for crystal-sharp text
   const header = `[Script Info]
-; Script generated by ISO SUB Engine
+; Script generated by ISO SUB Engine (2-Layer Subtitle Architecture with Per-Word Static Anchors)
 Title: Animated Captions Full HD
 ScriptType: v4.00+
 WrapStyle: 0
@@ -191,14 +275,14 @@ PlayResY: ${virtualHeight}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},${fontSizeAss},${primaryColorAss},${highlightColorAss},${outlineColorAss},${shadowColorAss},${boldVal},0,0,0,100,100,${style.letterSpacing || 1},0,1,${strokeAss},${shadowAss},${anCode},40,40,40,1
+Style: Default,${fontName},${fontSizeAss},${primaryColorAss},${highlightColorAss},${outlineColorAss},${shadowColorAss},${boldVal},0,0,0,100,100,${style.letterSpacing || 1},0,1,${strokeAss},0,${anCode},40,40,40,1
+Style: ShadowStyle,${fontName},${fontSizeAss},${shadowColorAss},${shadowColorAss},${shadowColorAss},${shadowColorAss},${boldVal},0,0,0,100,100,${style.letterSpacing || 1},0,1,${strokeAss},0,${anCode},40,40,40,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
   const dialogueLines: string[] = [];
-  const baseEffectsTag = blurAss > 0 ? `\\blur${blurAss}` : '';
 
   for (const block of blocks) {
     if (!block.words || block.words.length === 0) {
@@ -206,154 +290,149 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       const text = transformTextCase(block.text, style.caseTransform);
       const start = formatAssTime(block.start);
       const end = formatAssTime(block.end);
-      const line = `Dialogue: 0,${start},${end},Default,,0,0,0,,{\\pos(${posX},${posY})${baseEffectsTag}}${text}`;
-      dialogueLines.push(line);
+      
+      if (hasShadow) {
+        dialogueLines.push(`Dialogue: 0,${start},${end},ShadowStyle,,0,0,0,,{\\pos(${posX},${shadowPosY})\\blur${blurAssVal}\\1c${shadowColorAss}\\3c${shadowColorAss}}${text}`);
+      }
+      dialogueLines.push(`Dialogue: 1,${start},${end},Default,,0,0,0,,{\\pos(${posX},${posY})}${text}`);
       continue;
     }
 
-    // Determine 1-line vs 2-line layout:
-    // Only wrap to 2 lines if total words strictly EXCEED wordsPerLine (e.g. 4+ words for 3 words/line)
+    // Format and measure words to establish static pixel anchors
+    const formattedWords = block.words.map((w, idx) => {
+      const display = transformTextCase(w.text, style.caseTransform);
+      const width = estimateTextWidth(display, fontSizeAss, style.letterSpacing || 1);
+      return {
+        ...w,
+        index: idx,
+        display,
+        width,
+        centerX: 0,
+        y: 0,
+        shadowY: 0
+      };
+    });
+
+    const spaceWidth = estimateTextWidth(' ', fontSizeAss, style.letterSpacing || 1);
+    const lineSpacing = Math.round(fontSizeAss * (style.lineHeight || 1.25));
+
+    // Determine 1-line vs 2-line layout
     const targetWordsPerLine = style.wordsPerLine || 3;
-    const isMultiline = (style.maxLines === 2 && block.words.length > targetWordsPerLine) || (block.words.length >= 6);
+    const isMultiline = (style.maxLines === 2 && formattedWords.length > 1) || (formattedWords.length >= 6);
+    const splitIndex = isMultiline ? findOptimalSplitIndex(formattedWords, targetWordsPerLine) : formattedWords.length;
+
+    const line1Words = formattedWords.slice(0, splitIndex);
+    const line2Words = isMultiline ? formattedWords.slice(splitIndex) : [];
+
+    const line1Width = line1Words.reduce((sum, w) => sum + w.width, 0) + Math.max(0, line1Words.length - 1) * spaceWidth;
+    const line2Width = line2Words.reduce((sum, w) => sum + w.width, 0) + Math.max(0, line2Words.length - 1) * spaceWidth;
+
+    const line1Y = isMultiline ? posY - Math.round(lineSpacing / 2) : posY;
+    const line2Y = isMultiline ? posY + Math.round(lineSpacing / 2) : posY;
+
+    // Calculate static center coordinate for each word in Line 1
+    let curX1 = posX - line1Width / 2;
+    line1Words.forEach((w) => {
+      w.centerX = Math.round(curX1 + w.width / 2);
+      w.y = line1Y;
+      w.shadowY = line1Y + shadowDistAss;
+      curX1 += w.width + spaceWidth;
+    });
+
+    // Calculate static center coordinate for each word in Line 2
+    let curX2 = posX - line2Width / 2;
+    line2Words.forEach((w) => {
+      w.centerX = Math.round(curX2 + w.width / 2);
+      w.y = line2Y;
+      w.shadowY = line2Y + shadowDistAss;
+      curX2 += w.width + spaceWidth;
+    });
 
     const isLine1Hidden = block.hidden || block.hiddenLines?.includes(1);
     const isLine2Hidden = block.hidden || (isMultiline && block.hiddenLines?.includes(2));
 
-    if (isLine1Hidden && (!isMultiline || isLine2Hidden)) {
-      continue; // entire block hidden
-    }
-    
-    let splitIndex = targetWordsPerLine;
-    if (isMultiline && block.words.length > targetWordsPerLine) {
-      if (block.words.length === 4 && targetWordsPerLine === 3) {
-        splitIndex = 2;
-      }
-      const punctIdx = block.words.findIndex((w, idx) => idx >= 0 && idx < block.words.length - 1 && /[,.?!…:;]$/.test(w.text.trim()));
-      if (punctIdx !== -1 && punctIdx + 1 <= targetWordsPerLine) {
-        splitIndex = punctIdx + 1;
-      }
-    }
-    splitIndex = isMultiline ? Math.min(block.words.length - 1, Math.max(1, splitIndex)) : -1;
+    const visibleWords = formattedWords.filter((w) => {
+      const isL1 = w.index < splitIndex;
+      if (isL1 && isLine1Hidden) return false;
+      if (!isL1 && isLine2Hidden) return false;
+      return true;
+    });
+
+    if (visibleWords.length === 0) continue;
 
     const isHighlightEnabled = style.useHighlight !== false;
 
-    if (!isHighlightEnabled || style.animationType === 'none') {
-      // Plain text without word-by-word highlights
+    if (!isHighlightEnabled || (style.animationType === 'none' && !style.useWordHighlightBox)) {
+      // Static block without highlight animations
       const start = formatAssTime(block.start);
       const end = formatAssTime(block.end);
-      let wordsText = '';
-      for (let j = 0; j < block.words.length; j++) {
-        const isWordInL1 = splitIndex !== -1 ? j < splitIndex : true;
-        const isWordInL2 = splitIndex !== -1 ? j >= splitIndex : false;
-        if ((isWordInL1 && isLine1Hidden) || (isWordInL2 && isLine2Hidden)) continue;
-
-        if (j === splitIndex && !isLine1Hidden && !isLine2Hidden) {
-          wordsText = wordsText.trim() + '\\N';
+      
+      for (const w of visibleWords) {
+        if (hasShadow) {
+          dialogueLines.push(`Dialogue: 0,${start},${end},ShadowStyle,,0,0,0,,{\\pos(${w.centerX},${w.shadowY})\\blur${blurAssVal}\\1c${shadowColorAss}\\3c${shadowColorAss}}${w.display}`);
         }
-        wordsText += transformTextCase(block.words[j].text, style.caseTransform) + ' ';
-      }
-      if (wordsText.trim()) {
-        dialogueLines.push(`Dialogue: 0,${start},${end},Default,,0,0,0,,{\\pos(${posX},${posY})${baseEffectsTag}}${wordsText.trim()}`);
+        dialogueLines.push(`Dialogue: 1,${start},${end},Default,,0,0,0,,{\\pos(${w.centerX},${w.y})\\1c${primaryColorAss}\\3c${outlineColorAss}}${w.display}`);
       }
       continue;
     }
 
-    if (style.animationType === 'karaoke') {
-      // Progressive Karaoke fill: spoken words stay highlighted
-      for (let i = 0; i < block.words.length; i++) {
-        const isWordInL1 = splitIndex !== -1 ? i < splitIndex : true;
-        const isWordInL2 = splitIndex !== -1 ? i >= splitIndex : false;
-        if ((isWordInL1 && isLine1Hidden) || (isWordInL2 && isLine2Hidden)) continue;
+    // Word-by-word animations (Pop, Bounce, Karaoke, Color Change, Word Box)
+    const wordBoxColorAss = hexToAssColor(style.wordHighlightBoxColor || style.highlightColor || '#7C3AED');
+    const wordBoxTextColorAss = hexToAssColor(style.wordHighlightBoxTextColor || '#FFFFFF');
 
-        const activeWord = block.words[i];
-        const nextWord = block.words[i + 1];
+    for (let i = 0; i < formattedWords.length; i++) {
+      const activeWord = formattedWords[i];
+      const nextWord = formattedWords[i + 1];
 
-        const wordStart = activeWord.start;
-        const wordEnd = nextWord ? Math.min(block.end, nextWord.start) : block.end;
+      const wordStart = activeWord.start;
+      const wordEnd = nextWord ? Math.min(block.end, nextWord.start) : block.end;
 
-        if (wordEnd <= wordStart) continue;
+      if (wordEnd <= wordStart) continue;
 
-        const startStr = formatAssTime(wordStart);
-        const endStr = formatAssTime(wordEnd);
+      const startStr = formatAssTime(wordStart);
+      const endStr = formatAssTime(wordEnd);
 
-        let lineText = `{\\pos(${posX},${posY})${baseEffectsTag}}`;
+      const isKaraoke = style.animationType === 'karaoke';
+      const isPop = style.animationType === 'pop' || style.animationType === 'bounce';
+      const safeScale = Math.min(1.25, Math.max(1.05, style.animationScale || 1.18));
+      const scaleMax = Math.round(safeScale * 100);
+      const dur = Math.min(150, Math.round((wordEnd - wordStart) * 500));
 
-        for (let j = 0; j < block.words.length; j++) {
-          const isJL1 = splitIndex !== -1 ? j < splitIndex : true;
-          const isJL2 = splitIndex !== -1 ? j >= splitIndex : false;
-          if ((isJL1 && isLine1Hidden) || (isJL2 && isLine2Hidden)) continue;
+      for (const w of visibleWords) {
+        const isWordActive = (w.index === i);
+        const isWordHighlighted = isKaraoke ? (w.index <= i) : isWordActive;
 
-          const w = block.words[j];
-          const wText = transformTextCase(w.text, style.caseTransform);
+        // Pass 0: Word Highlight Box (Caixa Destaque)
+        if (isWordActive && style.useWordHighlightBox) {
+          const halfW = Math.round(w.width / 2 + 10);
+          const halfH = Math.round(fontSizeAss * 0.65 + 4);
+          dialogueLines.push(`Dialogue: 1,${startStr},${endStr},Default,,0,0,0,,{\\an5\\pos(${w.centerX},${w.y})\\bord0\\shad0\\1c${wordBoxColorAss}\\p1}m -${halfW} -${halfH} l ${halfW} -${halfH} l ${halfW} ${halfH} l -${halfW} ${halfH}{\\p0}`);
+        }
 
-          if (j === splitIndex && !isLine1Hidden && !isLine2Hidden) {
-            lineText = lineText.trim() + '\\N';
-          }
-
-          if (j <= i) {
-            // Spoken words stay in highlight color
-            lineText += `{\\1c${highlightColorAss}\\3c${outlineColorAss}}${wText} `;
+        // Layer 0: Soft Drop Shadow (scales only for active word, skip if word box is active)
+        if (hasShadow && !(isWordActive && style.useWordHighlightBox)) {
+          if (isWordActive && isPop) {
+            dialogueLines.push(`Dialogue: 0,${startStr},${endStr},ShadowStyle,,0,0,0,,{\\pos(${w.centerX},${w.shadowY})\\blur${blurAssVal}\\1c${shadowColorAss}\\3c${shadowColorAss}\\t(0,${dur},\\fscx${scaleMax}\\fscy${scaleMax})\\t(${dur},${dur * 2},\\fscx100\\fscy100)}${w.display}`);
           } else {
-            // Future words remain in primary base text color
-            lineText += `{\\1c${primaryColorAss}\\3c${outlineColorAss}}${wText} `;
+            dialogueLines.push(`Dialogue: 0,${startStr},${endStr},ShadowStyle,,0,0,0,,{\\pos(${w.centerX},${w.shadowY})\\blur${blurAssVal}\\1c${shadowColorAss}\\3c${shadowColorAss}}${w.display}`);
           }
         }
 
-        if (lineText.trim()) {
-          dialogueLines.push(`Dialogue: 0,${startStr},${endStr},Default,,0,0,0,,${lineText.trim()}`);
-        }
-      }
-    } else {
-      // Word-by-word highlight (Pop, Bounce, Color Change)
-      for (let i = 0; i < block.words.length; i++) {
-        const isWordInL1 = splitIndex !== -1 ? i < splitIndex : true;
-        const isWordInL2 = splitIndex !== -1 ? i >= splitIndex : false;
-        if ((isWordInL1 && isLine1Hidden) || (isWordInL2 && isLine2Hidden)) continue;
+        // Layer 2: Foreground Text
+        const textColor = (isWordActive && style.useWordHighlightBox)
+          ? wordBoxTextColorAss
+          : isWordHighlighted
+          ? highlightColorAss
+          : primaryColorAss;
 
-        const activeWord = block.words[i];
-        const nextWord = block.words[i + 1];
+        const outlineColor = (isWordActive && style.useWordHighlightBox && (style.strokeWidth ?? 0) <= 4)
+          ? wordBoxColorAss
+          : outlineColorAss;
 
-        const wordStart = activeWord.start;
-        // Strictly bound by nextWord.start and block.end to avoid any overlap
-        const wordEnd = nextWord ? Math.min(block.end, nextWord.start) : block.end;
-
-        if (wordEnd <= wordStart) continue;
-
-        const startStr = formatAssTime(wordStart);
-        const endStr = formatAssTime(wordEnd);
-
-        let lineText = `{\\pos(${posX},${posY})${baseEffectsTag}}`;
-
-        for (let j = 0; j < block.words.length; j++) {
-          const isJL1 = splitIndex !== -1 ? j < splitIndex : true;
-          const isJL2 = splitIndex !== -1 ? j >= splitIndex : false;
-          if ((isJL1 && isLine1Hidden) || (isJL2 && isLine2Hidden)) continue;
-
-          const w = block.words[j];
-          const wText = transformTextCase(w.text, style.caseTransform);
-
-          if (j === splitIndex && !isLine1Hidden && !isLine2Hidden) {
-            lineText = lineText.trim() + '\\N';
-          }
-
-          if (j === i) {
-            // Active word
-            if (style.animationType === 'pop' || style.animationType === 'bounce') {
-              const scaleMax = Math.round((style.animationScale || 1.22) * 100);
-              const dur = Math.min(150, Math.round((wordEnd - wordStart) * 500));
-              lineText += `{\\1c${highlightColorAss}\\3c${outlineColorAss}\\t(0,${dur},\\fscx${scaleMax}\\fscy${scaleMax})\\t(${dur},${dur * 2},\\fscx100\\fscy100)}${wText} `;
-            } else {
-              // Color highlight without scale jump
-              lineText += `{\\1c${highlightColorAss}\\3c${outlineColorAss}}${wText} `;
-            }
-          } else {
-            // Inactive word
-            lineText += `{\\1c${primaryColorAss}\\3c${outlineColorAss}}${wText} `;
-          }
-        }
-
-        if (lineText.trim()) {
-          dialogueLines.push(`Dialogue: 0,${startStr},${endStr},Default,,0,0,0,,${lineText.trim()}`);
+        if (isWordActive && isPop) {
+          dialogueLines.push(`Dialogue: 2,${startStr},${endStr},Default,,0,0,0,,{\\pos(${w.centerX},${w.y})\\1c${textColor}\\3c${outlineColor}\\t(0,${dur},\\fscx${scaleMax}\\fscy${scaleMax})\\t(${dur},${dur * 2},\\fscx100\\fscy100)}${w.display}`);
+        } else {
+          dialogueLines.push(`Dialogue: 2,${startStr},${endStr},Default,,0,0,0,,{\\pos(${w.centerX},${w.y})\\1c${textColor}\\3c${outlineColor}}${w.display}`);
         }
       }
     }

@@ -11,7 +11,12 @@ import {
   AlertCircle,
   Sparkles,
   FileVideo,
-  Edit3
+  Edit3,
+  Smartphone,
+  Tv,
+  Music2,
+  Zap,
+  Check
 } from 'lucide-react';
 import { SubtitleBlock, SubtitleStyle, VideoMetadata, RenderJobProgress } from '../../types';
 import { apiEndpoint, resolveMediaUrl } from '../../utils/api';
@@ -26,6 +31,8 @@ interface ExportModalProps {
   onClose: () => void;
 }
 
+type ExportDestination = 'instagram' | 'tiktok' | 'youtube' | 'prores' | 'subtitles';
+
 export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
   fileId,
@@ -35,13 +42,25 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   style,
   onClose
 }) => {
-  const [exportType, setExportType] = useState<'mp4' | 'prores' | 'subtitles'>('mp4');
+  const [destination, setDestination] = useState<ExportDestination>('instagram');
   const [subFormat, setSubFormat] = useState<'ass' | 'srt' | 'vtt' | 'json'>('ass');
   const [customName, setCustomName] = useState<string>('video-legendado');
+  const [optimize50MB, setOptimize50MB] = useState<boolean>(false);
   const [isRendering, setIsRendering] = useState(false);
   const [renderJob, setRenderJob] = useState<RenderJobProgress | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [explorerSuccess, setExplorerSuccess] = useState(false);
+
+  // Auto-detect best platform preset based on video proportions
+  useEffect(() => {
+    if (metadata?.width && metadata?.height) {
+      if (metadata.width > metadata.height) {
+        setDestination('youtube');
+      } else {
+        setDestination('instagram');
+      }
+    }
+  }, [metadata, isOpen]);
 
   // Initialize or reset custom filename based on original video name
   useEffect(() => {
@@ -64,6 +83,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   if (!isOpen) return null;
 
+  const isHorizontal = metadata?.width && metadata?.height ? metadata.width > metadata.height : false;
+  const isVideoExport = destination === 'instagram' || destination === 'tiktok' || destination === 'youtube';
+
   const getCleanBaseName = () => {
     const clean = customName.trim().replace(/[^a-zA-Z0-9_\-\. ]/g, '_');
     return clean.length > 0 ? clean : 'video-legendado';
@@ -77,7 +99,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       const baseName = getCleanBaseName();
 
-      if (exportType === 'mp4') {
+      if (isVideoExport) {
         const res = await fetch(apiEndpoint('/api/render/mp4'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -85,7 +107,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             fileId,
             blocks,
             style,
-            customFileName: `${baseName}.mp4`
+            customFileName: `${baseName}.mp4`,
+            presetPlatform: destination,
+            optimize50MB
           })
         });
 
@@ -96,7 +120,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
         const data = await res.json();
         listenToProgress(data.jobId);
-      } else if (exportType === 'prores') {
+      } else if (destination === 'prores') {
         const res = await fetch(apiEndpoint('/api/render/prores'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -104,8 +128,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             blocks,
             style,
             duration: metadata?.duration || 10,
-            width: metadata?.width || 1080,
-            height: metadata?.height || 1920,
+            width: metadata?.width || (isHorizontal ? 1920 : 1080),
+            height: metadata?.height || (isHorizontal ? 1080 : 1920),
             fps: metadata?.fps || 30,
             customFileName: `${baseName}.mov`
           })
@@ -118,7 +142,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
         const data = await res.json();
         listenToProgress(data.jobId);
-      } else if (exportType === 'subtitles') {
+      } else if (destination === 'subtitles') {
         // Direct download subtitle file
         const res = await fetch(apiEndpoint('/api/export/subtitles'), {
           method: 'POST',
@@ -127,8 +151,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             blocks,
             style,
             format: subFormat,
-            width: metadata?.width || 1080,
-            height: metadata?.height || 1920
+            width: metadata?.width || (isHorizontal ? 1920 : 1080),
+            height: metadata?.height || (isHorizontal ? 1080 : 1920)
           })
         });
 
@@ -196,50 +220,64 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   const getFileExtension = () => {
-    if (exportType === 'mp4') return '.mp4';
-    if (exportType === 'prores') return '.mov';
+    if (isVideoExport) return '.mp4';
+    if (destination === 'prores') return '.mov';
     return `.${subFormat}`;
   };
 
+  const getFormatBadge = () => {
+    if (!metadata?.width || !metadata?.height) return 'Formato Nativo';
+    const { width, height } = metadata;
+    const ratio = width / height;
+
+    if (Math.abs(ratio - 16 / 9) < 0.05) return '16:9 Horizontal';
+    if (Math.abs(ratio - 9 / 16) < 0.05) return '9:16 Vertical';
+    if (Math.abs(ratio - 1) < 0.05) return '1:1 Quadrado';
+    if (Math.abs(ratio - 4 / 5) < 0.05) return '4:5 Retrato';
+    return `${width}x${height} Nativo`;
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-fadeIn select-none">
-      <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl p-6 shadow-2xl relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fadeIn select-none">
+      <div className="bg-white border-2 border-neutral-900 rounded-3xl w-full max-w-2xl p-6 shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+        <div className="flex items-center justify-between pb-4 border-b border-neutral-200 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-neutral-900 text-white flex items-center justify-center shadow-sm">
               <Download className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900 text-base">Exportar Vídeo & Legendas</h3>
-              <p className="text-xs text-slate-500 font-medium">Qualidade máxima Full HD otimizada para Instagram, TikTok e YouTube</p>
+              <h3 className="font-extrabold text-neutral-900 text-base">Exportar Vídeo & Legendas</h3>
+              <p className="text-xs text-neutral-500 font-medium">
+                Renderização na resolução nativa ({metadata?.width || 1920}x{metadata?.height || 1080}) adaptada para redes sociais
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition"
+            className="p-2 rounded-xl text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 transition cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex flex-col gap-4 mt-5">
+        <div className="flex flex-col gap-4 mt-4 overflow-y-auto pr-1">
           {/* Completed State Display */}
           {renderJob?.status === 'completed' ? (
-            <div className="flex flex-col items-center justify-center p-6 bg-slate-50 border border-slate-200 rounded-2xl text-center">
-              <div className="w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center mb-3 shadow-md">
-                <CheckCircle className="w-8 h-8" />
+            <div className="flex flex-col items-center justify-center p-8 bg-neutral-50 border-2 border-neutral-200 rounded-2xl text-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center mb-3 shadow-lg ring-4 ring-emerald-100">
+                <CheckCircle className="w-9 h-9" />
               </div>
-              <h4 className="font-extrabold text-slate-900 text-base">Exportação Concluída com Sucesso!</h4>
-              <p className="text-xs text-slate-600 font-mono mt-1 mb-4 max-w-md break-all">
-                Arquivo salvo como: <strong className="text-slate-900">{renderJob.outputFileName}</strong>
+              <h4 className="font-black text-neutral-900 text-lg">Exportação Concluída com Sucesso!</h4>
+              <p className="text-xs text-neutral-600 font-mono mt-1 mb-5 max-w-md break-all bg-white p-2.5 rounded-xl border border-neutral-200 shadow-xs">
+                Arquivo salvo: <strong className="text-neutral-950">{renderJob.outputFileName}</strong>
               </p>
 
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleOpenExplorer}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-sm transition active:scale-95"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-black text-white text-xs font-bold shadow-sm transition active:scale-95 cursor-pointer"
                 >
                   <FolderOpen className="w-4 h-4" />
                   <span>{explorerSuccess ? 'Pasta Aberta!' : 'Abrir Pasta no Windows'}</span>
@@ -248,7 +286,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <a
                   href={resolveMediaUrl(`/storage/renders/${renderJob.outputFileName}`)}
                   download={renderJob.outputFileName}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-bold border border-slate-200 transition active:scale-95"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 text-xs font-bold border-2 border-neutral-300 transition active:scale-95 shadow-sm cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
                   <span>Baixar Arquivo</span>
@@ -257,88 +295,193 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             </div>
           ) : (
             <>
-              {/* 1. INPUT DE NOME DO ARQUIVO */}
-              <div className="flex flex-col gap-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Edit3 className="w-4 h-4 text-slate-700" />
+              {/* 1. SELETOR VISUAL DE DESTINO / PLATAFORMA */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-neutral-900 uppercase tracking-wide">
+                    Destino & Plataforma de Exportação:
+                  </span>
+                  <span className="text-[10px] font-mono font-bold bg-neutral-900 text-white px-2.5 py-0.5 rounded-md shadow-xs">
+                    {getFormatBadge()} • {metadata?.width || 1920}x{metadata?.height || 1080}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {/* Instagram Card */}
+                  <div
+                    onClick={() => setDestination('instagram')}
+                    className={`flex flex-col p-3 rounded-2xl border-2 cursor-pointer transition relative ${
+                      destination === 'instagram'
+                        ? 'bg-neutral-900 text-white border-neutral-900 shadow-md ring-2 ring-neutral-900/10'
+                        : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Smartphone className={`w-4 h-4 ${destination === 'instagram' ? 'text-pink-400' : 'text-pink-600'}`} />
+                      {destination === 'instagram' && (
+                        <span className="w-2 h-2 rounded-full bg-pink-400 ring-2 ring-white/20" />
+                      )}
+                    </div>
+                    <span className="text-xs font-black">Instagram (Feed & Reels)</span>
+                    <span className={`text-[10px] mt-0.5 ${destination === 'instagram' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                      {getFormatBadge()} • Cores Rec.709
+                    </span>
+                  </div>
+
+                  {/* TikTok Card */}
+                  <div
+                    onClick={() => setDestination('tiktok')}
+                    className={`flex flex-col p-3 rounded-2xl border-2 cursor-pointer transition relative ${
+                      destination === 'tiktok'
+                        ? 'bg-neutral-900 text-white border-neutral-900 shadow-md ring-2 ring-neutral-900/10'
+                        : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Music2 className={`w-4 h-4 ${destination === 'tiktok' ? 'text-cyan-400' : 'text-cyan-600'}`} />
+                      {destination === 'tiktok' && (
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 ring-2 ring-white/20" />
+                      )}
+                    </div>
+                    <span className="text-xs font-black">TikTok</span>
+                    <span className={`text-[10px] mt-0.5 ${destination === 'tiktok' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                      {getFormatBadge()} • Nitidez Mobile
+                    </span>
+                  </div>
+
+                  {/* YouTube Card */}
+                  <div
+                    onClick={() => setDestination('youtube')}
+                    className={`flex flex-col p-3 rounded-2xl border-2 cursor-pointer transition relative ${
+                      destination === 'youtube'
+                        ? 'bg-neutral-900 text-white border-neutral-900 shadow-md ring-2 ring-neutral-900/10'
+                        : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Tv className={`w-4 h-4 ${destination === 'youtube' ? 'text-red-400' : 'text-red-600'}`} />
+                      {destination === 'youtube' && (
+                        <span className="w-2 h-2 rounded-full bg-red-400 ring-2 ring-white/20" />
+                      )}
+                    </div>
+                    <span className="text-xs font-black">YouTube</span>
+                    <span className={`text-[10px] mt-0.5 ${destination === 'youtube' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                      {getFormatBadge()} • Alto Bitrate
+                    </span>
+                  </div>
+
+                  {/* ProRes 4444 Alpha Card */}
+                  <div
+                    onClick={() => setDestination('prores')}
+                    className={`flex flex-col p-3 rounded-2xl border-2 cursor-pointer transition relative ${
+                      destination === 'prores'
+                        ? 'bg-neutral-900 text-white border-neutral-900 shadow-md ring-2 ring-neutral-900/10'
+                        : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <Layers className={`w-4 h-4 ${destination === 'prores' ? 'text-amber-400' : 'text-amber-600'}`} />
+                      {destination === 'prores' && (
+                        <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-white/20" />
+                      )}
+                    </div>
+                    <span className="text-xs font-black">ProRes 4444 Alpha</span>
+                    <span className={`text-[10px] mt-0.5 ${destination === 'prores' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                      Fundo Transparente ({metadata?.width || 1920}x{metadata?.height || 1080})
+                    </span>
+                  </div>
+
+                  {/* Subtitles File Card */}
+                  <div
+                    onClick={() => setDestination('subtitles')}
+                    className={`flex flex-col p-3 rounded-2xl border-2 cursor-pointer transition relative ${
+                      destination === 'subtitles'
+                        ? 'bg-neutral-900 text-white border-neutral-900 shadow-md ring-2 ring-neutral-900/10'
+                        : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <FileText className={`w-4 h-4 ${destination === 'subtitles' ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                      {destination === 'subtitles' && (
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white/20" />
+                      )}
+                    </div>
+                    <span className="text-xs font-black">Arquivo de Legenda</span>
+                    <span className={`text-[10px] mt-0.5 ${destination === 'subtitles' ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                      .ASS / .SRT / .VTT / .JSON
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. OPCIONAL: COMPACTAÇÃO < 50MB (Para Instagram/TikTok) */}
+              {(destination === 'instagram' || destination === 'tiktok') && (
+                <div
+                  onClick={() => setOptimize50MB(!optimize50MB)}
+                  className={`flex items-center justify-between p-3 rounded-2xl border-2 cursor-pointer transition select-none ${
+                    optimize50MB
+                      ? 'bg-amber-50/80 border-amber-400 text-neutral-900 shadow-xs'
+                      : 'bg-neutral-50 hover:bg-neutral-100 border-neutral-200 text-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${optimize50MB ? 'bg-amber-500 text-white shadow-xs' : 'bg-neutral-200 text-neutral-600'}`}>
+                      <Zap className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black text-neutral-900">
+                        Otimizar para menos de 50 MB
+                      </span>
+                      <span className="text-[11px] text-neutral-500">
+                        Ajusta a taxa de bits para o arquivo não sofrer recompressão agressiva do Instagram/TikTok.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border-2 transition ${
+                    optimize50MB
+                      ? 'bg-amber-500 border-amber-500 text-white'
+                      : 'border-neutral-300 bg-white'
+                  }`}>
+                    {optimize50MB && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. INPUT DE NOME DO ARQUIVO */}
+              <div className="flex flex-col gap-1.5 bg-neutral-50 p-3.5 rounded-2xl border border-neutral-200">
+                <label className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                  <Edit3 className="w-4 h-4 text-neutral-700" />
                   <span>Nome do Arquivo Final:</span>
                 </label>
-                <div className="flex items-center bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 focus-within:border-slate-900 transition shadow-sm">
-                  <FileVideo className="w-4 h-4 text-slate-500 shrink-0 mr-2" />
+                <div className="flex items-center bg-white border border-neutral-300 rounded-xl px-3.5 py-2 focus-within:border-neutral-900 transition shadow-sm">
+                  <FileVideo className="w-4 h-4 text-neutral-500 shrink-0 mr-2" />
                   <input
                     type="text"
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     placeholder="Digite o nome do arquivo..."
-                    className="flex-1 bg-transparent text-xs font-mono font-bold text-slate-900 focus:outline-none tracking-wide"
+                    className="flex-1 bg-transparent text-xs font-mono font-bold text-neutral-900 focus:outline-none tracking-wide"
                   />
-                  <span className="text-xs font-mono font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded border border-slate-200 shrink-0">
+                  <span className="text-xs font-mono font-bold text-neutral-900 bg-neutral-100 px-2.5 py-1 rounded border border-neutral-200 shrink-0">
                     {getFileExtension()}
                   </span>
                 </div>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  Preenchido automaticamente com o nome do vídeo. Você pode editar como preferir.
-                </span>
               </div>
 
-              {/* 2. Format Selection Cards */}
-              <div className="grid grid-cols-3 gap-3">
-                {/* MP4 Card */}
-                <div
-                  onClick={() => setExportType('mp4')}
-                  className={`flex flex-col p-4 rounded-2xl border cursor-pointer transition ${
-                    exportType === 'mp4'
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-1 ring-slate-900'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
-                  }`}
-                >
-                  <Film className={`w-5 h-5 mb-2 ${exportType === 'mp4' ? 'text-white' : 'text-slate-700'}`} />
-                  <span className="text-xs font-bold">MP4 Vídeo</span>
-                  <span className={`text-[11px] mt-0.5 ${exportType === 'mp4' ? 'text-slate-300' : 'text-slate-500'}`}>Burn-in completo Full HD</span>
-                </div>
-
-                {/* ProRes 4444 Alpha Card */}
-                <div
-                  onClick={() => setExportType('prores')}
-                  className={`flex flex-col p-4 rounded-2xl border cursor-pointer transition ${
-                    exportType === 'prores'
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-1 ring-slate-900'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
-                  }`}
-                >
-                  <Layers className={`w-5 h-5 mb-2 ${exportType === 'prores' ? 'text-white' : 'text-slate-700'}`} />
-                  <span className="text-xs font-bold">ProRes 4444</span>
-                  <span className={`text-[11px] font-semibold mt-0.5 ${exportType === 'prores' ? 'text-slate-300' : 'text-slate-500'}`}>Alpha (Transparência)</span>
-                </div>
-
-                {/* Subtitles File Card */}
-                <div
-                  onClick={() => setExportType('subtitles')}
-                  className={`flex flex-col p-4 rounded-2xl border cursor-pointer transition ${
-                    exportType === 'subtitles'
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-1 ring-slate-900'
-                      : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800'
-                  }`}
-                >
-                  <FileText className={`w-5 h-5 mb-2 ${exportType === 'subtitles' ? 'text-white' : 'text-slate-700'}`} />
-                  <span className="text-xs font-bold">Legenda Texto</span>
-                  <span className={`text-[11px] mt-0.5 ${exportType === 'subtitles' ? 'text-slate-300' : 'text-slate-500'}`}>Arquivo .ASS / SRT / VTT</span>
-                </div>
-              </div>
-
-              {/* Subtitle Format selector if subtitles chosen */}
-              {exportType === 'subtitles' && (
-                <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                  <span className="text-xs font-bold text-slate-700">Formato da Legenda:</span>
+              {/* 4. Subtitle Format selector if subtitles chosen */}
+              {destination === 'subtitles' && (
+                <div className="flex items-center gap-2 bg-neutral-50 p-3 rounded-2xl border border-neutral-200">
+                  <span className="text-xs font-bold text-neutral-700">Formato da Legenda:</span>
                   <div className="flex items-center gap-1.5 ml-auto">
                     {(['ass', 'srt', 'vtt', 'json'] as const).map((fmt) => (
                       <button
                         key={fmt}
                         onClick={() => setSubFormat(fmt)}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg uppercase font-mono transition ${
+                        className={`px-3 py-1 text-xs font-bold rounded-lg uppercase font-mono transition cursor-pointer ${
                           subFormat === fmt
-                            ? 'bg-slate-900 text-white shadow-sm'
-                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                            ? 'bg-neutral-900 text-white shadow-sm'
+                            : 'bg-white text-neutral-700 border border-neutral-200 hover:bg-neutral-100'
                         }`}
                       >
                         .{fmt}
@@ -349,10 +492,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               )}
 
               {/* Technical summary info */}
-              <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200 flex items-center justify-between text-xs text-slate-700 font-mono">
-                <span>Preset: <strong className="text-slate-900">{style.presetName}</strong></span>
-                <span>Blocos: <strong className="text-slate-900">{blocks.length}</strong></span>
-                <span>Resolução: <strong className="text-slate-900">{metadata?.width || 1080}x{metadata?.height || 1920}</strong></span>
+              <div className="bg-neutral-100 rounded-2xl p-3 border border-neutral-200 flex items-center justify-between text-xs text-neutral-700 font-mono">
+                <span>Preset: <strong className="text-neutral-900">{style.presetName}</strong></span>
+                <span>Proporção: <strong className="text-neutral-900">{getFormatBadge()}</strong></span>
+                <span>Resolução: <strong className="text-neutral-900">{metadata?.width || (isHorizontal ? 1920 : 1080)}x{metadata?.height || (isHorizontal ? 1080 : 1920)}</strong></span>
               </div>
 
               {/* Error message */}
@@ -365,26 +508,26 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
               {/* Live Progress Bar if rendering */}
               {isRendering && renderJob && (
-                <div className="flex flex-col gap-2 p-4 bg-slate-50 border border-slate-300 rounded-2xl">
+                <div className="flex flex-col gap-2 p-4 bg-neutral-50 border border-neutral-300 rounded-2xl">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
-                      Renderizando via FFmpeg...
+                    <span className="font-bold text-neutral-800 flex items-center gap-1.5">
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-900" />
+                      Renderizando via FFmpeg ({destination.toUpperCase()})...
                     </span>
-                    <span className="font-mono text-slate-900 font-bold">
+                    <span className="font-mono text-neutral-900 font-bold">
                       {renderJob.progressPercent}%
                     </span>
                   </div>
 
-                  <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                  <div className="w-full bg-neutral-200 rounded-full h-2.5 overflow-hidden">
                     <div
                       style={{ width: `${renderJob.progressPercent}%` }}
-                      className="h-full bg-slate-900 rounded-full transition-all duration-300"
+                      className="h-full bg-neutral-900 rounded-full transition-all duration-300"
                     />
                   </div>
 
                   {renderJob.fps && (
-                    <span className="text-[11px] text-slate-500 font-mono self-end font-medium">
+                    <span className="text-[11px] text-neutral-500 font-mono self-end font-medium">
                       Velocidade: {renderJob.fps} FPS
                     </span>
                   )}
@@ -392,11 +535,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               )}
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-3 mt-2 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-3 mt-1 pt-3 border-t border-neutral-200">
                 <button
                   onClick={onClose}
                   disabled={isRendering}
-                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition disabled:opacity-50 cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -404,7 +547,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <button
                   onClick={handleStartRender}
                   disabled={isRendering || blocks.length === 0}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-black disabled:opacity-50 text-white text-xs font-bold shadow-sm transition transform active:scale-95"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-neutral-900 hover:bg-black disabled:opacity-50 text-white text-xs font-bold shadow-sm transition transform active:scale-95 cursor-pointer"
                 >
                   {isRendering ? (
                     <>
@@ -415,9 +558,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                     <>
                       <Sparkles className="w-4 h-4 text-amber-300" />
                       <span>
-                        {exportType === 'subtitles'
+                        {destination === 'subtitles'
                           ? 'Baixar Legenda'
-                          : `Iniciar Renderização (${exportType.toUpperCase()})`}
+                          : `Exportar para ${destination === 'instagram' ? 'Instagram' : (destination === 'tiktok' ? 'TikTok' : (destination === 'youtube' ? 'YouTube' : 'ProRes 4444'))}`}
                       </span>
                     </>
                   )}

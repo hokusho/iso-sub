@@ -15,23 +15,28 @@
   }
 }
 
-/* Minimalist clean scrollbars with neutral gray */
+/* Global Dark Brand Red Scrollbars (Transparent Track) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #991b1b transparent;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #e5e7eb;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #808080;
+  background: #991b1b;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #666666;
+  background: #7f1d1d;
 }
 
 /* Clean solid range sliders (No gradients) with 50% neutral gray track */

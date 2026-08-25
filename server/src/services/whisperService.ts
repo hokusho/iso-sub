@@ -12,6 +12,21 @@ export interface TranscribeOptions {
 }
 
 /**
+ * Checks if a word is significant for subtitle line counting.
+ * Short particles <= 2 letters are treated as weight 0.
+ */
+export function isSignificantWord(wordText: string): boolean {
+  if (!wordText) return false;
+  const clean = wordText.trim().toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  if (!clean) return false;
+  return clean.length > 2;
+}
+
+export function countSignificantWords(words: (string | SubtitleWord)[]): number {
+  return words.filter(w => isSignificantWord(typeof w === 'string' ? w : w.text)).length;
+}
+
+/**
  * Group flat word list into formatted SubtitleBlocks
  */
 export function groupWordsIntoBlocks(words: SubtitleWord[], maxWordsPerBlock = 3): SubtitleBlock[] {
@@ -31,12 +46,17 @@ export function groupWordsIntoBlocks(words: SubtitleWord[], maxWordsPerBlock = 3
     const hasLongPause = nextWord ? (nextWord.start - word.end > 0.45) : false;
     
     // Check punctuation ending (. ? ! ; :)
-    const hasPunctuation = /[.?!;:]$/.test(word.text.trim());
-    
-    // Check reached max words per block
-    const reachedMaxWords = currentWords.length >= maxWordsPerBlock;
+    const cleanWord = word.text.trim();
+    const hasTerminalPunctuation = /[.?!…:;]$/.test(cleanWord);
+    const hasComma = /[,]$/.test(cleanWord);
 
-    if (reachedMaxWords || hasLongPause || hasPunctuation || isLastWord) {
+    const currentWordCount = currentWords.length;
+    const currentCharCount = currentWords.map(w => w.text).join(' ').length;
+    const reachedMaxWords = currentWordCount >= maxWordsPerBlock;
+    const reachedMaxChars = currentCharCount >= 32;
+    const shouldBreakOnComma = hasComma && (currentWordCount >= maxWordsPerBlock);
+
+    if (reachedMaxWords || reachedMaxChars || shouldBreakOnComma || hasLongPause || hasTerminalPunctuation || isLastWord) {
       const blockStart = currentWords[0].start;
       let rawEnd = currentWords[currentWords.length - 1].end;
       if (nextWord && rawEnd > nextWord.start) {

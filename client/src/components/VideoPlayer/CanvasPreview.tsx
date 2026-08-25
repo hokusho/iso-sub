@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { SubtitleBlock, SubtitleStyle, AspectRatio, SafeZoneMode } from '../../types';
+import { findOptimalSplitIndex } from '../../utils/textChunker';
 import {
   Heart,
   MessageCircle,
@@ -45,19 +46,19 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Aspect ratio dimension calculations - Always fit 100% height
+  // Aspect ratio dimension calculations - Always fit stage nicely
   const getAspectRatioClasses = () => {
     switch (aspectRatio) {
       case '9:16':
-        return 'aspect-[9/16] h-full max-h-full w-auto';
+        return 'aspect-[9/16] h-full max-h-full w-auto max-w-full';
       case '16:9':
-        return 'aspect-[16/9] w-full max-h-full h-auto';
+        return 'aspect-[16/9] w-full max-h-full h-auto max-w-full';
       case '1:1':
-        return 'aspect-square h-full max-h-full w-auto';
+        return 'aspect-square h-full max-h-full w-auto max-w-full';
       case '4:5':
-        return 'aspect-[4/5] h-full max-h-full w-auto';
+        return 'aspect-[4/5] h-full max-h-full w-auto max-w-full';
       default:
-        return 'aspect-[9/16] h-full max-h-full w-auto';
+        return 'aspect-[9/16] h-full max-h-full w-auto max-w-full';
     }
   };
 
@@ -75,9 +76,24 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Internal reference resolution (1080 x 1920 base for 9:16)
-    const baseWidth = 1080;
-    const baseHeight = 1920;
+    // Dynamic reference resolution matching active aspect ratio
+    let baseWidth = 1080;
+    let baseHeight = 1920;
+
+    if (aspectRatio === '16:9') {
+      baseWidth = 1920;
+      baseHeight = 1080;
+    } else if (aspectRatio === '1:1') {
+      baseWidth = 1080;
+      baseHeight = 1080;
+    } else if (aspectRatio === '4:5') {
+      baseWidth = 1080;
+      baseHeight = 1350;
+    } else {
+      baseWidth = 1080;
+      baseHeight = 1920;
+    }
+
     canvas.width = baseWidth;
     canvas.height = baseHeight;
 
@@ -93,8 +109,9 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
       ? activeBlock.words
       : [{ id: '1', text: activeBlock.text, start: activeBlock.start, end: activeBlock.end }];
 
-    // Exact font size chosen by user (e.g. 44px * 2 = 88px in Full HD 1080p canvas)
-    const fontSize = (style.fontSize || 44) * 2;
+    // Scale font size proportionally according to canvas height
+    const scaleFactor = (baseHeight / 1920) * 2;
+    const fontSize = (style.fontSize || 44) * scaleFactor;
     const fontWeight = style.fontWeight || 800;
     const fontFamily = style.fontFamily || 'Montserrat';
 
@@ -118,13 +135,25 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     const isHighlightEnabled = style.useHighlight !== false;
     const isKaraoke = style.animationType === 'karaoke';
 
-    const formattedWords = words.map(w => ({
+    // Find the single active word index for precise 1-word highlighting
+    let singleActiveIndex = -1;
+    if (isHighlightEnabled && !isKaraoke) {
+      singleActiveIndex = words.findIndex(w => currentTime >= w.start && currentTime < w.end);
+      if (singleActiveIndex === -1) {
+        singleActiveIndex = words.findIndex((w, idx) => {
+          const next = words[idx + 1];
+          return currentTime >= w.start && (next ? currentTime < next.start : currentTime <= w.end);
+        });
+      }
+    }
+
+    const formattedWords = words.map((w, idx) => ({
       ...w,
       display: formatWord(w.text),
       isActive: isHighlightEnabled && (
         isKaraoke
           ? currentTime >= w.start
-          : (currentTime >= w.start && currentTime < w.end)
+          : idx === singleActiveIndex
       )
     }));
 
@@ -136,20 +165,9 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     }));
 
     // Determine 1-line vs 2-line layout:
-    const targetWordsPerLine = style.wordsPerLine || 3;
-    const isMultiline = (style.maxLines === 2 && words.length > targetWordsPerLine) || (words.length >= 6);
-
-    let splitIndex = targetWordsPerLine;
-    if (isMultiline && wordMeasures.length > targetWordsPerLine) {
-      if (wordMeasures.length === 4 && targetWordsPerLine === 3) {
-        splitIndex = 2;
-      }
-      const punctIdx = wordMeasures.findIndex((w, idx) => idx >= 0 && idx < wordMeasures.length - 1 && /[,.?!…:;]$/.test(w.text.trim()));
-      if (punctIdx !== -1 && punctIdx + 1 <= targetWordsPerLine) {
-        splitIndex = punctIdx + 1;
-      }
-    }
-    splitIndex = isMultiline ? Math.min(wordMeasures.length - 1, Math.max(1, splitIndex)) : wordMeasures.length;
+    const targetWordsPerLine = style.wordsPerLine || 4;
+    const splitIndex = style.maxLines === 2 ? findOptimalSplitIndex(words, targetWordsPerLine) : words.length;
+    const isMultiline = style.maxLines === 2 && splitIndex < words.length;
 
     const line1Words = wordMeasures.slice(0, splitIndex);
     const line2Words = isMultiline ? wordMeasures.slice(splitIndex) : [];
@@ -192,6 +210,50 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
 
     // Helper to render a single line of words
     const renderWordLine = (lineWords: typeof wordMeasures, lineTotalWidth: number, targetY: number) => {
+      const baseFontPx = (style.fontSize || 54) * 2;
+      const strokeWidthPx = hasStroke ? (style.strokeWidth || 8) * 2.8 * (fontSize / baseFontPx) : 0;
+      const safeBlur = Math.min(12, Math.max(0, style.shadowBlur ?? 0));
+      const shadowDist = (style.shadowDistance ?? 4) * (scaleFactor * 0.75);
+      const shadowBlurPx = safeBlur * (scaleFactor * 0.75);
+      const shadowCol = style.shadowColor || 'rgba(0,0,0,0.85)';
+
+      // -------------------------------------------------------------
+      // CAMADA DE FUNDO (Layer -1): Caixa Destaque na Palavra Ativa
+      // É desenhada ANTES de todo o texto para NUNCA cobrir letras vizinhas
+      // -------------------------------------------------------------
+      if (style.useWordHighlightBox) {
+        let boxTrackX = posX - lineTotalWidth / 2;
+        lineWords.forEach((w) => {
+          const wordCenterX = boxTrackX + w.width / 2;
+          if (w.isActive) {
+            const boxColor = style.wordHighlightBoxColor || style.highlightColor || '#7C3AED';
+            const padX = (style.wordHighlightBoxPaddingX ?? 6) * scaleFactor;
+            const padY = (style.wordHighlightBoxPaddingY ?? 2) * scaleFactor;
+            const radius = (style.wordHighlightBoxRadius ?? 6) * scaleFactor;
+            const boxW = w.width + padX * 2;
+            const boxH = fontSize * 1.05 + padY * 2;
+            const boxX = wordCenterX - boxW / 2;
+            const boxY = targetY - boxH / 2;
+
+            ctx.save();
+            if (hasShadow) {
+              ctx.shadowColor = shadowCol;
+              ctx.shadowBlur = shadowBlurPx;
+              ctx.shadowOffsetY = shadowDist;
+            }
+            ctx.fillStyle = boxColor;
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+            ctx.fill();
+            ctx.restore();
+          }
+          boxTrackX += w.width + spaceWidth;
+        });
+      }
+
+      // -------------------------------------------------------------
+      // CAMADA DE TEXTO (Layers 0, 1 e 2): Sombra, Contorno e Preenchimento
+      // -------------------------------------------------------------
       let currentX = posX - lineTotalWidth / 2;
 
       lineWords.forEach((w) => {
@@ -212,7 +274,8 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
 
           if (timeIntoWord < dur) {
             const progress = timeIntoWord / dur;
-            scale = 1.0 + ((style.animationScale || 1.22) - 1.0) * Math.sin(progress * Math.PI);
+            const safeScale = Math.min(1.25, Math.max(1.05, style.animationScale || 1.18));
+            scale = 1.0 + (safeScale - 1.0) * Math.sin(progress * Math.PI);
           } else {
             scale = 1.0;
           }
@@ -220,37 +283,46 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
           ctx.scale(scale, scale);
         }
 
-        // 1. Pass 1: Sombra / Glow (desenhada atrás)
-        if (hasShadow) {
+        // 1. Pass 1: Sombra Projetada Suave (Camada Traseira Layer 0)
+        if (hasShadow && !(isWordActive && style.useWordHighlightBox)) {
           ctx.save();
-          ctx.shadowColor = style.shadowColor || '#000000';
-          ctx.shadowBlur = (style.shadowBlur || 4) * 2.5;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = (style.shadowDistance || 3) * 2.5;
-          ctx.fillStyle = isWordActive ? (style.highlightColor || '#FFE600') : (style.textColor || '#FFFFFF');
-          ctx.fillText(w.display, 0, 0);
+          if (shadowBlurPx > 0) {
+            ctx.filter = `blur(${shadowBlurPx}px)`;
+          }
+          if (hasStroke) {
+            ctx.strokeStyle = shadowCol;
+            ctx.lineWidth = strokeWidthPx;
+            ctx.lineJoin = 'round';
+            ctx.miterLimit = 2;
+            ctx.strokeText(w.display, 0, shadowDist);
+          }
+          ctx.fillStyle = shadowCol;
+          ctx.fillText(w.display, 0, shadowDist);
           ctx.restore();
         }
 
-        // 2. Pass 2: Contorno / Stroke (desenhado com espessura nítida)
-        if (hasStroke) {
+        // 2. Pass 2: Contorno / Stroke Principal (Camada Frontal Layer 1)
+        if (hasStroke && !(isWordActive && style.useWordHighlightBox && (style.strokeWidth ?? 0) <= 4)) {
           ctx.save();
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
+          ctx.filter = 'none';
           ctx.strokeStyle = style.strokeColor || '#000000';
-          const baseFontPx = (style.fontSize || 54) * 2;
-          ctx.lineWidth = (style.strokeWidth || 8) * 2.8 * (fontSize / baseFontPx);
+          ctx.lineWidth = strokeWidthPx;
           ctx.lineJoin = 'round';
           ctx.miterLimit = 2;
           ctx.strokeText(w.display, 0, 0);
           ctx.restore();
         }
 
-        // 3. Pass 3: Preenchimento do Texto (nítido por cima do contorno)
+        // 3. Pass 3: Preenchimento do Texto (Camada Frontal Layer 2 - 100% Cristalino e Nítido)
+        const textFillColor = (isWordActive && style.useWordHighlightBox)
+          ? (style.wordHighlightBoxTextColor || '#FFFFFF')
+          : isWordActive
+          ? (style.highlightColor || '#FFE600')
+          : (style.textColor || '#FFFFFF');
+
         ctx.save();
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = isWordActive ? (style.highlightColor || '#FFE600') : (style.textColor || '#FFFFFF');
+        ctx.filter = 'none';
+        ctx.fillStyle = textFillColor;
         ctx.fillText(w.display, 0, 0);
         ctx.restore();
 
@@ -312,7 +384,7 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
       {/* ========================================================================= */}
       {/* 100% PROPORTIONALLY SCALED SOCIAL MEDIA SAFE ZONES OVERLAY (Container CQ) */}
       {/* ========================================================================= */}
-      {safeZoneMode !== 'off' && (
+      {safeZoneMode !== 'off' && aspectRatio === '9:16' && (
         <div
           className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between overflow-hidden text-white font-sans"
           style={{ fontSize: '3cqw' }}

@@ -195,7 +195,21 @@ router.post('/rechunk', (req: Request, res: Response): void => {
  */
 router.post('/render/mp4', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { fileId, blocks, style, customFileName }: { fileId: string; blocks: SubtitleBlock[]; style: SubtitleStyle; customFileName?: string } = req.body;
+    const {
+      fileId,
+      blocks,
+      style,
+      customFileName,
+      presetPlatform = 'custom',
+      optimize50MB = false
+    }: {
+      fileId: string;
+      blocks: SubtitleBlock[];
+      style: SubtitleStyle;
+      customFileName?: string;
+      presetPlatform?: 'instagram' | 'tiktok' | 'youtube' | 'custom';
+      optimize50MB?: boolean;
+    } = req.body;
 
     if (!fileId || !blocks || !style) {
       res.status(400).json({ error: 'Missing required parameters (fileId, blocks, style)' });
@@ -221,7 +235,7 @@ router.post('/render/mp4', async (req: Request, res: Response): Promise<void> =>
     const outputPath = path.resolve(RENDERS_DIR, outputFileName);
     const assPath = path.resolve(TEMP_DIR, `sub-${jobId}.ass`);
 
-    // Generate ASS file
+    // Generate ASS file with exact video dimensions
     const assContent = buildAssSubtitle({
       width: metadata.width,
       height: metadata.height,
@@ -246,6 +260,7 @@ router.post('/render/mp4', async (req: Request, res: Response): Promise<void> =>
       assPath,
       outputPath,
       metadata.duration,
+      { presetPlatform, optimize50MB },
       (p) => {
         broadcastProgress(jobId, {
           jobId,
