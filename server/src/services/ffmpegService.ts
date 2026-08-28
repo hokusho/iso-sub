@@ -6,17 +6,18 @@ import ffprobeStatic from 'ffprobe-static';
 import { VideoMetadata, RenderJobProgress } from '../types';
 import { TEMP_DIR, RENDERS_DIR } from '../config';
 
+import { FONTS_DIR, ensureFontsDownloaded } from './fontService';
+
 const FFMPEG_PATH = typeof ffmpegStatic === 'string' ? ffmpegStatic : (ffmpegStatic as any).default || 'ffmpeg';
 const FFPROBE_PATH = (ffprobeStatic as any).path || 'ffprobe';
 
 /**
- * Normalizes a file path for use in FFmpeg filters (e.g. ass='C\:/path/to/file.ass')
+ * Normalizes a file path for use in FFmpeg filters (e.g. ass=filename='C\:/path/to/file.ass':fontsdir='C\:/path/to/fonts')
  * On Windows, colons and backslashes must be escaped or converted to forward slashes.
  */
 export function escapeFilterPath(rawPath: string): string {
   const normalized = path.resolve(rawPath).replace(/\\/g, '/');
-  // Escape the colon after drive letter: C:/ -> C\:/
-  return normalized.replace(/^([a-zA-Z]):/, '$1\\:');
+  return normalized.replace(/:/g, '\\:');
 }
 
 /**
@@ -99,14 +100,14 @@ export function probeVideo(filePath: string): Promise<VideoMetadata> {
           width,
           height,
           fps,
-          aspectRatio,
+          aspectRatio: aspectRatio as any,
           hasAudio: !!audioStream,
           format: format.format_name || 'mp4',
           videoCodec: videoStream?.codec_name,
           sizeBytes
         });
-      } catch (err) {
-        reject(new Error(`Failed to parse ffprobe output: ${err}`));
+      } catch (err: any) {
+        reject(new Error(`Failed to parse ffprobe output: ${err.message}`));
       }
     });
   });
@@ -176,8 +177,10 @@ export function extractAudioToWav(videoPath: string, outputWavPath: string): Pro
   });
 }
 
+export const extractAudioForWhisper = extractAudioToWav;
+
 /**
- * Extracts audio waveform peaks as normalized float array (0.0 to 1.0)
+ * Extracts fast waveform audio peaks (100-600 data points) for smooth interactive UI rendering
  */
 export function generateWaveformPeaks(audioOrVideoPath: string, numPeaks = 600): Promise<number[]> {
   return new Promise((resolve) => {
@@ -208,9 +211,7 @@ export function generateWaveformPeaks(audioOrVideoPath: string, numPeaks = 600):
 
     proc.on('close', (code) => {
       if (code !== 0 && chunks.length === 0) {
-        // Fallback: generate smooth simulated peaks if audio extraction failed
-        const fallbackPeaks = Array.from({ length: numPeaks }, () => Math.random() * 0.5 + 0.1);
-        return resolve(fallbackPeaks);
+        return resolve(Array.from({ length: numPeaks }, () => 0.1));
       }
 
       const totalBuffer = Buffer.concat(chunks);
@@ -227,7 +228,6 @@ export function generateWaveformPeaks(audioOrVideoPath: string, numPeaks = 600):
         let maxVal = 0;
 
         for (let j = start; j < end; j++) {
-          // u8 PCM is centered at 128
           const val = Math.abs(totalBuffer[j] - 128) / 128;
           if (val > maxVal) maxVal = val;
         }
@@ -239,6 +239,8 @@ export function generateWaveformPeaks(audioOrVideoPath: string, numPeaks = 600):
     });
   });
 }
+
+export const extractWaveformPeaks = generateWaveformPeaks;
 
 /**
  * Parses time string HH:MM:SS.ms to seconds
@@ -270,10 +272,17 @@ export function renderMp4WithAss(
   options: RenderMp4Options = {},
   onProgress?: (progress: { percent: number; currentSec: number; fps: number }) => void
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      await ensureFontsDownloaded();
+    } catch (e) {
+      console.warn('[renderMp4WithAss] Font download check skipped/failed:', e);
+    }
+
     const escapedAss = escapeFilterPath(assPath);
-    // Direct subtitle burn-in preserving the video's original resolution (1920x1080 horizontal, 1080x1920 vertical, 4K, etc.)
-    const filterChain = `ass='${escapedAss}'`;
+    const escapedFontsDir = escapeFilterPath(FONTS_DIR);
+    // Direct subtitle burn-in with bundled fonts directory (Montserrat, Anton, Poppins, etc.)
+    const filterChain = `ass=filename='${escapedAss}':fontsdir='${escapedFontsDir}'`;
 
     const args = [
       '-y',
@@ -358,14 +367,21 @@ export function renderProResWithAlpha(
   outputPath: string,
   onProgress?: (progress: { percent: number; currentSec: number; fps: number }) => void
 ): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      await ensureFontsDownloaded();
+    } catch (e) {
+      console.warn('[renderProResWithAlpha] Font download check skipped/failed:', e);
+    }
+
     const escapedAss = escapeFilterPath(assPath);
+    const escapedFontsDir = escapeFilterPath(FONTS_DIR);
     // Create completely transparent video canvas using lavfi color=color=black@0.0 and apply ASS subtitle
     const args = [
       '-y',
       '-f', 'lavfi',
       '-i', `color=color=black@0.0:size=${width}x${height}:rate=${fps}:duration=${duration},format=rgba`,
-      '-vf', `ass='${escapedAss}'`,
+      '-vf', `ass=filename='${escapedAss}':fontsdir='${escapedFontsDir}'`,
       '-c:v', 'prores_ks',
       '-profile:v', '4', // ProRes 4444 with alpha
       '-pix_fmt', 'yuva444p10le',

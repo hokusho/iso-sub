@@ -85,21 +85,21 @@ export const Navbar: React.FC<NavbarProps> = ({
   const hasCacheToClear = Boolean(cacheInfo && cacheInfo.totalBytes > 0);
 
   return (
-    <header className="h-18 border-b-2 border-neutral-300 bg-white flex items-center justify-between px-6 select-none z-30 shrink-0 shadow-sm py-2.5">
+    <header className="h-16 border-b-2 border-neutral-300 bg-white flex items-center justify-between px-4 lg:px-6 select-none z-30 shrink-0 shadow-sm flex-nowrap min-w-0">
       {/* Brand Title: ISO (Mais grossa e em vermelho) + SUB (Mais fino) */}
-      <div className="flex items-center gap-3.5">
+      <div className="flex items-center gap-3 shrink-0">
         <div className="flex flex-col">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <div className="flex items-baseline">
-              <h1 className="text-2xl tracking-tight leading-none">
+              <h1 className="text-xl lg:text-2xl tracking-tight leading-none">
                 <span className="font-black text-[#B91C1C]">ISO</span>{' '}
                 <span className="font-semibold text-neutral-600">SUB</span>
               </h1>
             </div>
           </div>
           {fileName && (
-            <div className="flex items-center gap-1 text-xs text-neutral-600 font-mono font-medium truncate max-w-sm mt-1">
-              <FileVideo className="w-4 h-4 text-neutral-500" />
+            <div className="flex items-center gap-1 text-[11px] text-neutral-600 font-mono font-medium truncate max-w-[150px] lg:max-w-[240px] mt-0.5">
+              <FileVideo className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
               <span className="truncate">{fileName}</span>
             </div>
           )}
@@ -107,16 +107,16 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Main Action Buttons & Cache Tools */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-1.5 lg:gap-2 shrink-0 flex-nowrap">
         {/* Cache & Temp Files Disk Space Indicator / Cleanup Menu */}
-        <div className="relative" ref={cacheRef}>
+        <div className="relative shrink-0" ref={cacheRef}>
           <button
             type="button"
             onClick={() => setIsCacheMenuOpen(!isCacheMenuOpen)}
             title="Tamanho do Cache e Limpeza de Disco"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-300 text-xs font-mono font-black transition active:scale-95 shadow-sm"
+            className="flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-300 text-xs font-mono font-black transition active:scale-95 shadow-sm whitespace-nowrap"
           >
-            <HardDrive className="w-3.5 h-3.5 text-neutral-700" />
+            <HardDrive className="w-3.5 h-3.5 text-neutral-700 shrink-0" />
             <span>Cache: {totalFormatted}</span>
           </button>
 
@@ -179,15 +179,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        <div className="h-7 w-px bg-neutral-300 mx-0.5" />
+        <div className="h-6 w-px bg-neutral-300 mx-0.5 shrink-0" />
 
         {/* Upload / Change Video Button */}
         <button
           onClick={onUploadClick}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-300 text-xs font-bold transition active:scale-95 shadow-sm"
+          className="flex items-center gap-1.5 px-3 lg:px-3.5 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-300 text-xs font-bold transition active:scale-95 shadow-sm whitespace-nowrap shrink-0"
           title="Carregar Novo Vídeo"
         >
-          <Upload className="w-4 h-4 text-neutral-800" />
+          <Upload className="w-3.5 h-3.5 text-neutral-800 shrink-0" />
           <span>{fileName ? 'Trocar Vídeo' : 'Carregar Vídeo'}</span>
         </button>
 
@@ -195,31 +195,31 @@ export const Navbar: React.FC<NavbarProps> = ({
         {onImportSubtitlesClick && (
           <button
             onClick={onImportSubtitlesClick}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-300 text-xs font-bold transition active:scale-95 shadow-sm"
+            className="flex items-center gap-1.5 px-3 lg:px-3.5 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border border-neutral-300 text-xs font-bold transition active:scale-95 shadow-sm whitespace-nowrap shrink-0"
             title="Importar Arquivo de Legenda (.SRT / .ASS / .VTT)"
           >
             <span>Importar .SRT</span>
           </button>
         )}
 
-        <div className="h-7 w-px bg-neutral-300 mx-0.5" />
+        <div className="h-6 w-px bg-neutral-300 mx-0.5 shrink-0" />
 
         {/* Quick Tool: Search & Replace */}
         <button
           onClick={onOpenSearchReplace}
           title="Localizar e Substituir Palavras"
-          className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition active:scale-95"
+          className="p-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition active:scale-95 shrink-0"
         >
-          <Search className="w-4 h-4" />
+          <Search className="w-3.5 h-3.5" />
         </button>
 
         {/* Quick Tool: API Keys Settings */}
         <button
           onClick={onOpenApiKeys}
           title="Configurar Chave Gratuita da Groq (Whisper)"
-          className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition active:scale-95"
+          className="p-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition active:scale-95 shrink-0"
         >
-          <Key className="w-4 h-4" />
+          <Key className="w-3.5 h-3.5" />
         </button>
 
         {/* Quick Tool: License / Serial Management */}
@@ -227,13 +227,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onOpenLicense}
             title={currentLicense ? `Licença Ativa: ${currentLicense.customerName}` : "Inserir Serial de Ativação"}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 border shadow-sm ${
+            className={`flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 border shadow-sm shrink-0 whitespace-nowrap ${
               currentLicense
                 ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
                 : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
             }`}
           >
-            <ShieldCheck className={`w-3.5 h-3.5 ${currentLicense ? 'text-emerald-600' : 'text-amber-600'} stroke-[2.5]`} />
+            <ShieldCheck className={`w-3.5 h-3.5 ${currentLicense ? 'text-emerald-600' : 'text-amber-600'} stroke-[2.5] shrink-0`} />
             <span className="font-mono text-[11px] font-black">
               {currentLicense?.isLifetime ? 'Vitalício' : currentLicense ? `${currentLicense.daysRemaining}d` : 'Serial'}
             </span>
@@ -244,17 +244,17 @@ export const Navbar: React.FC<NavbarProps> = ({
         <button
           onClick={onOpenExplorer}
           title="Abrir Pasta de Exportação no Windows Explorer"
-          className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition active:scale-95"
+          className="p-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 transition active:scale-95 shrink-0"
         >
-          <FolderOpen className="w-4 h-4" />
+          <FolderOpen className="w-3.5 h-3.5" />
         </button>
 
         {/* Big Export Button */}
         <button
           onClick={onOpenExport}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-neutral-900 hover:bg-black text-white text-xs font-black shadow-sm transition transform active:scale-95 ml-1"
+          className="flex items-center gap-2 px-4 lg:px-5 py-1.5 rounded-xl bg-neutral-900 hover:bg-black text-white text-xs font-black shadow-sm transition transform active:scale-95 ml-1 shrink-0 whitespace-nowrap"
         >
-          <Download className="w-4 h-4 text-white" />
+          <Download className="w-3.5 h-3.5 text-white shrink-0" />
           <span>Exportar Vídeo</span>
         </button>
       </div>

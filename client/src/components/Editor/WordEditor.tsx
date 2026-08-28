@@ -609,7 +609,10 @@ export const WordEditor: React.FC<WordEditorProps> = ({
           return (
             <div
               key={block.id}
-              onClick={() => onSelectBlock(block.id)}
+              onClick={() => {
+                onSelectBlock(block.id);
+                onSeek(block.start + 0.05);
+              }}
               className={`flex flex-col rounded-2xl transition-all p-3.5 ${
                 isActive
                   ? 'bg-white border-[2.5px] border-neutral-950 shadow-md ring-2 ring-neutral-950/20'
@@ -657,10 +660,10 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                         e.stopPropagation();
                         onSeek(block.start);
                       }}
-                      title="Ouvir este trecho"
-                      className="flex items-center gap-1 text-xs font-mono font-black px-1.5 py-0.5 rounded hover:bg-neutral-200 text-neutral-900 transition"
+                      title="Ir para este momento do vídeo"
+                      className="text-xs font-mono font-bold px-1.5 py-0.5 rounded hover:bg-neutral-200 transition text-neutral-900 flex items-center gap-1"
                     >
-                      <Play className="w-2.5 h-2.5 fill-current" />
+                      <Play className="w-2.5 h-2.5 fill-current text-neutral-900" />
                       <span>{formatTimecode(block.start)}</span>
                     </button>
 
@@ -751,12 +754,16 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                   <input
                     ref={(el) => { inputRefs.current[`${block.id}-1`] = el; }}
                     type="text"
-                    value={isMultiline ? line1Text : block.text}
+                    value={isMultiline ? line1Text : (block.words && block.words.length > 0 ? block.words.map(w => w.text).join(' ') : block.text)}
+                    onFocus={() => {
+                      onSelectBlock(block.id);
+                      onSeek(block.start + 0.05);
+                    }}
                     onChange={(e) => {
                       if (isMultiline) {
                         handleUpdateLineText(block, 1, e.target.value, splitIndex);
                       } else {
-                        onUpdateBlock(block.id, { text: e.target.value });
+                        handleUpdateFullBlockText(block, e.target.value);
                       }
                     }}
                     className={`flex-1 rounded-xl px-3 py-1.5 text-sm font-black border-2 transition shadow-sm ${
@@ -833,6 +840,10 @@ export const WordEditor: React.FC<WordEditorProps> = ({
                       ref={(el) => { inputRefs.current[`${block.id}-2`] = el; }}
                       type="text"
                       value={line2Text}
+                      onFocus={() => {
+                        onSelectBlock(block.id);
+                        onSeek(block.start + 0.05);
+                      }}
                       onChange={(e) => handleUpdateLineText(block, 2, e.target.value, splitIndex)}
                       className={`flex-1 rounded-xl px-3 py-1.5 text-sm font-black border-2 transition shadow-sm ${
                         isLine2Hidden

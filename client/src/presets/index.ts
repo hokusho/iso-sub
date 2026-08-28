@@ -3,6 +3,7 @@ import { Preset, SubtitleStyle } from '../types';
 export const DEFAULT_STYLE: SubtitleStyle = {
   presetName: 'Destaque Animado',
   fontFamily: 'Montserrat',
+  fontWeight: 800,
   fontSize: 20,
   lineHeight: 1.2,
   letterSpacing: 1,
@@ -25,8 +26,8 @@ export const DEFAULT_STYLE: SubtitleStyle = {
   wordHighlightBoxColor: '#A855F7',
   wordHighlightBoxTextColor: '#FFFFFF',
   wordHighlightBoxRadius: 6,
-  wordHighlightBoxPaddingX: 6,
-  wordHighlightBoxPaddingY: 2,
+  wordHighlightBoxPaddingX: 4,
+  wordHighlightBoxPaddingY: 1,
   positionY: 74, // 74% from top (optimal 9:16 safe zone)
   positionX: 50,
   alignment: 'center',

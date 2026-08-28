@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SubtitleBlock, SubtitleStyle, AspectRatio, SafeZoneMode } from '../../types';
 import { findOptimalSplitIndex } from '../../utils/textChunker';
 import {
@@ -23,9 +23,9 @@ interface CanvasPreviewProps {
   duration: number;
   aspectRatio: AspectRatio;
   safeZoneMode: SafeZoneMode;
-  onAspectRatioDetected?: (ratio: AspectRatio) => void;
+  onAspectRatioDetected?: (aspectRatio: AspectRatio) => void;
   onTimeUpdate?: (time: number) => void;
-  onDurationChange?: (dur: number) => void;
+  onDurationChange?: (duration: number) => void;
   onTogglePlay?: () => void;
   onSeek?: (time: number) => void;
 }
@@ -64,6 +64,18 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     }
   };
 
+  const [fontLoadedTick, setFontLoadedTick] = useState<number>(0);
+
+  // Force canvas redraw when custom Google web fonts finish loading
+  useEffect(() => {
+    const fontStr = `${style.fontWeight || 800} 48px "${style.fontFamily || 'Montserrat'}"`;
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load(fontStr).then(() => {
+        setFontLoadedTick((t: number) => t + 1);
+      }).catch(() => {});
+    }
+  }, [style.fontFamily, style.fontWeight]);
+
   // Ensure video element reloads and displays the frame when videoUrl changes
   useEffect(() => {
     if (videoRef.current && videoUrl) {
@@ -72,7 +84,7 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
   }, [videoUrl, videoRef]);
 
   // Render animated subtitles on canvas (supporting 1 line and 2 lines seamlessly)
-  useEffect(() => {
+  const renderSubtitleFrame = (targetTime: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -102,14 +114,30 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     ctx.clearRect(0, 0, baseWidth, baseHeight);
 
     // Find active block
-    const activeBlock = blocks.find(b => currentTime >= b.start && currentTime <= b.end);
+    const activeBlock = blocks.find(b => targetTime >= b.start && targetTime <= b.end);
     if (!activeBlock) {
       return;
     }
 
-    const words = activeBlock.words && activeBlock.words.length > 0
-      ? activeBlock.words
-      : [{ id: '1', text: activeBlock.text, start: activeBlock.start, end: activeBlock.end }];
+    const rawTextWords = (activeBlock.text || '').trim().split(/\s+/).filter(Boolean);
+    let words = activeBlock.words && activeBlock.words.length > 0 ? activeBlock.words : [];
+
+    if (rawTextWords.length > 0) {
+      if (rawTextWords.length === words.length) {
+        words = words.map((w, idx) => ({ ...w, text: rawTextWords[idx] }));
+      } else {
+        const totalDur = Math.max(0.1, activeBlock.end - activeBlock.start);
+        const wDur = totalDur / rawTextWords.length;
+        words = rawTextWords.map((tw, idx) => ({
+          id: words[idx]?.id || `w_${idx}`,
+          text: tw,
+          start: activeBlock.start + idx * wDur,
+          end: activeBlock.start + (idx + 1) * wDur
+        }));
+      }
+    } else {
+      words = [{ id: '1', text: activeBlock.text, start: activeBlock.start, end: activeBlock.end }];
+    }
 
     // Scale font size proportionally according to canvas height
     const scaleFactor = (baseHeight / 1920) * 2;
@@ -121,12 +149,13 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Helper to format case
+    // Helper to format case and trim whitespace (preventing double/triple spacing)
     const formatWord = (text: string) => {
-      if (style.caseTransform === 'uppercase') return text.toUpperCase();
-      if (style.caseTransform === 'lowercase') return text.toLowerCase();
-      if (style.caseTransform === 'capitalize') return text.replace(/\b\w/g, c => c.toUpperCase());
-      return text;
+      const clean = (text || '').trim();
+      if (style.caseTransform === 'uppercase') return clean.toUpperCase();
+      if (style.caseTransform === 'lowercase') return clean.toLowerCase();
+      if (style.caseTransform === 'capitalize') return clean.replace(/\b\w/g, c => c.toUpperCase());
+      return clean;
     };
 
     // Calculate position
@@ -140,11 +169,11 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     // Find the single active word index for precise 1-word highlighting
     let singleActiveIndex = -1;
     if (isHighlightEnabled && !isKaraoke) {
-      singleActiveIndex = words.findIndex(w => currentTime >= w.start && currentTime < w.end);
+      singleActiveIndex = words.findIndex(w => targetTime >= w.start && targetTime < w.end);
       if (singleActiveIndex === -1) {
         singleActiveIndex = words.findIndex((w, idx) => {
           const next = words[idx + 1];
-          return currentTime >= w.start && (next ? currentTime < next.start : currentTime <= w.end);
+          return targetTime >= w.start && (next ? targetTime < next.start : targetTime <= w.end);
         });
       }
     }
@@ -154,16 +183,9 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
       display: formatWord(w.text),
       isActive: isHighlightEnabled && (
         isKaraoke
-          ? currentTime >= w.start
+          ? targetTime >= w.start
           : idx === singleActiveIndex
       )
-    }));
-
-    // Measure widths with spacing
-    const spaceWidth = ctx.measureText(' ').width + (style.letterSpacing || 0);
-    const wordMeasures = formattedWords.map(w => ({
-      ...w,
-      width: ctx.measureText(w.display).width + (style.letterSpacing || 0)
     }));
 
     // Determine 1-line vs 2-line layout:
@@ -171,11 +193,14 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     const splitIndex = style.maxLines === 2 ? findOptimalSplitIndex(words, targetWordsPerLine) : words.length;
     const isMultiline = style.maxLines === 2 && splitIndex < words.length;
 
-    const line1Words = wordMeasures.slice(0, splitIndex);
-    const line2Words = isMultiline ? wordMeasures.slice(splitIndex) : [];
+    const line1Words = formattedWords.slice(0, splitIndex);
+    const line2Words = isMultiline ? formattedWords.slice(splitIndex) : [];
 
-    const line1Width = line1Words.reduce((sum, w) => sum + w.width, 0) + Math.max(0, line1Words.length - 1) * spaceWidth;
-    const line2Width = line2Words.reduce((sum, w) => sum + w.width, 0) + Math.max(0, line2Words.length - 1) * spaceWidth;
+    const line1FullText = line1Words.map(w => w.display).join(' ');
+    const line2FullText = line2Words.map(w => w.display).join(' ');
+
+    const line1Width = ctx.measureText(line1FullText).width;
+    const line2Width = isMultiline ? ctx.measureText(line2FullText).width : 0;
     const maxLineWidth = Math.max(line1Width, line2Width);
 
     const lineSpacing = fontSize * (style.lineHeight || 1.25);
@@ -210,8 +235,9 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Helper to render a single line of words
-    const renderWordLine = (lineWords: typeof wordMeasures, lineTotalWidth: number, targetY: number) => {
+    // Helper to render a single line of words with continuous native font spacing
+    const renderWordLine = (lineWords: typeof formattedWords, fullText: string, lineTotalWidth: number, targetY: number) => {
+      const lineStartX = posX - lineTotalWidth / 2;
       const baseFontPx = (style.fontSize || 54) * 2;
       const strokeWidthPx = hasStroke ? (style.strokeWidth || 8) * 2.8 * (fontSize / baseFontPx) : 0;
       const safeBlur = Math.min(12, Math.max(0, style.shadowBlur ?? 0));
@@ -219,47 +245,12 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
       const shadowBlurPx = safeBlur * (scaleFactor * 0.75);
       const shadowCol = style.shadowColor || 'rgba(0,0,0,0.85)';
 
-      // -------------------------------------------------------------
-      // CAMADA DE FUNDO (Layer -1): Caixa Destaque na Palavra Ativa
-      // É desenhada ANTES de todo o texto para NUNCA cobrir letras vizinhas
-      // -------------------------------------------------------------
-      if (style.useWordHighlightBox) {
-        let boxTrackX = posX - lineTotalWidth / 2;
-        lineWords.forEach((w) => {
-          const wordCenterX = boxTrackX + w.width / 2;
-          if (w.isActive) {
-            const boxColor = style.wordHighlightBoxColor || style.highlightColor || '#7C3AED';
-            const padX = (style.wordHighlightBoxPaddingX ?? 6) * scaleFactor;
-            const padY = (style.wordHighlightBoxPaddingY ?? 2) * scaleFactor;
-            const radius = (style.wordHighlightBoxRadius ?? 6) * scaleFactor;
-            const boxW = w.width + padX * 2;
-            const boxH = fontSize * 1.05 + padY * 2;
-            const boxX = wordCenterX - boxW / 2;
-            const boxY = targetY - boxH / 2;
-
-            ctx.save();
-            if (hasShadow) {
-              ctx.shadowColor = shadowCol;
-              ctx.shadowBlur = shadowBlurPx;
-              ctx.shadowOffsetY = shadowDist;
-            }
-            ctx.fillStyle = boxColor;
-            ctx.beginPath();
-            ctx.roundRect(boxX, boxY, boxW, boxH, radius);
-            ctx.fill();
-            ctx.restore();
-          }
-          boxTrackX += w.width + spaceWidth;
-        });
-      }
-
-      // -------------------------------------------------------------
-      // CAMADA DE TEXTO (Layers 0, 1 e 2): Sombra, Contorno e Preenchimento
-      // -------------------------------------------------------------
-      let currentX = posX - lineTotalWidth / 2;
-
-      lineWords.forEach((w) => {
-        const wordCenterX = currentX + w.width / 2;
+      // Render each word in order with unified Box and Text scaling
+      lineWords.forEach((w, idx) => {
+        const textBefore = lineWords.slice(0, idx).map(item => item.display).join(' ') + (idx > 0 ? ' ' : '');
+        const widthBefore = ctx.measureText(textBefore).width;
+        const wordWidth = ctx.measureText(w.display).width;
+        const wordCenterX = lineStartX + widthBefore + wordWidth / 2;
         const isWordActive = w.isActive;
 
         ctx.save();
@@ -268,24 +259,44 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
         ctx.textBaseline = 'middle';
         ctx.translate(wordCenterX, targetY);
 
-        // Handle Pop / Bounce animation scale
+        // Handle Pop / Bounce animation scale on active word
         if (isWordActive && (style.animationType === 'pop' || style.animationType === 'bounce')) {
-          const timeIntoWord = currentTime - w.start;
-          const dur = Math.min(0.2, (w.end - w.start) * 0.6);
-          let scale = 1.0;
+          const timeIntoWord = targetTime - w.start;
+          const dur = Math.min(0.22, Math.max(0.12, (w.end - w.start) * 0.6));
 
-          if (timeIntoWord < dur) {
+          if (timeIntoWord >= 0 && timeIntoWord < dur) {
             const progress = timeIntoWord / dur;
-            const safeScale = Math.min(1.25, Math.max(1.05, style.animationScale || 1.18));
-            scale = 1.0 + (safeScale - 1.0) * Math.sin(progress * Math.PI);
-          } else {
-            scale = 1.0;
+            const safeScale = Math.min(1.30, Math.max(1.08, style.animationScale || 1.18));
+            const scale = 1.0 + (safeScale - 1.0) * Math.sin(progress * Math.PI);
+            ctx.scale(scale, scale);
           }
-
-          ctx.scale(scale, scale);
         }
 
-        // 1. Pass 1: Sombra Projetada Suave (Camada Traseira Layer 0)
+        // 1. Pass -1: Caixa Destaque na Palavra Ativa (renderizada no mesmo espaço transformado)
+        if (isWordActive && style.useWordHighlightBox) {
+          const boxColor = style.wordHighlightBoxColor || style.highlightColor || '#7C3AED';
+          const padX = Math.max(4, (style.wordHighlightBoxPaddingX ?? 4) * (scaleFactor * 0.7));
+          const padY = Math.max(2, (style.wordHighlightBoxPaddingY ?? 1) * (scaleFactor * 0.7));
+          const boxW = Math.round(wordWidth + padX * 2);
+          const boxH = Math.round(fontSize * 0.95 + padY * 2);
+          const radius = Math.min(boxH / 2, (style.wordHighlightBoxRadius ?? 6) * scaleFactor);
+          const boxX = -boxW / 2;
+          const boxY = -boxH / 2;
+
+          ctx.save();
+          if (hasShadow) {
+            ctx.shadowColor = shadowCol;
+            ctx.shadowBlur = shadowBlurPx;
+            ctx.shadowOffsetY = shadowDist;
+          }
+          ctx.fillStyle = boxColor;
+          ctx.beginPath();
+          ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // 2. Pass 1: Sombra Projetada Suave (Camada Traseira Layer 0)
         if (hasShadow && !(isWordActive && style.useWordHighlightBox)) {
           ctx.save();
           if (shadowBlurPx > 0) {
@@ -303,7 +314,7 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
           ctx.restore();
         }
 
-        // 2. Pass 2: Contorno / Stroke Principal (Camada Frontal Layer 1)
+        // 3. Pass 2: Contorno / Stroke Principal (Camada Frontal Layer 1)
         if (hasStroke && !(isWordActive && style.useWordHighlightBox && (style.strokeWidth ?? 0) <= 4)) {
           ctx.save();
           ctx.filter = 'none';
@@ -315,9 +326,9 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
           ctx.restore();
         }
 
-        // 3. Pass 3: Preenchimento do Texto (Camada Frontal Layer 2 - 100% Cristalino e Nítido)
+        // 4. Pass 3: Preenchimento do Texto (Camada Frontal Layer 2)
         const textFillColor = isWordActive
-          ? (style.highlightColor || '#FFE600')
+          ? (style.useWordHighlightBox ? (style.wordHighlightBoxTextColor || '#FFFFFF') : (style.highlightColor || '#FFE600'))
           : (style.textColor || '#FFFFFF');
 
         ctx.save();
@@ -327,8 +338,6 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
         ctx.restore();
 
         ctx.restore();
-
-        currentX += w.width + spaceWidth;
       });
     };
 
@@ -337,15 +346,57 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
 
     // Render Line 1 (if not hidden)
     if (!isLine1Hidden && line1Words.length > 0) {
-      renderWordLine(line1Words, line1Width, line1Y);
+      renderWordLine(line1Words, line1FullText, line1Width, line1Y);
     }
 
     // Render Line 2 (if multiline and not hidden)
     if (isMultiline && !isLine2Hidden && line2Words.length > 0) {
-      renderWordLine(line2Words, line2Width, line2Y);
+      renderWordLine(line2Words, line2FullText, line2Width, line2Y);
+    }
+  };
+
+  // Continuous 60 FPS RequestAnimationFrame render loop
+  useEffect(() => {
+    let animationFrameId: number;
+
+    const loop = () => {
+      const vid = videoRef.current;
+      const t = vid ? vid.currentTime : currentTime;
+      renderSubtitleFrame(t);
+      if (vid && !vid.paused && !vid.ended) {
+        animationFrameId = requestAnimationFrame(loop);
+      }
+    };
+
+    loop();
+
+    const vid = videoRef.current;
+    const onPlay = () => {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = requestAnimationFrame(loop);
+    };
+    const onPause = () => {
+      cancelAnimationFrame(animationFrameId);
+      if (vid) renderSubtitleFrame(vid.currentTime);
+    };
+
+    if (vid) {
+      vid.addEventListener('play', onPlay);
+      vid.addEventListener('pause', onPause);
+      vid.addEventListener('seeking', onPause);
+      vid.addEventListener('seeked', onPause);
     }
 
-  }, [currentTime, blocks, style, aspectRatio]);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (vid) {
+        vid.removeEventListener('play', onPlay);
+        vid.removeEventListener('pause', onPause);
+        vid.removeEventListener('seeking', onPause);
+        vid.removeEventListener('seeked', onPause);
+      }
+    };
+  }, [currentTime, blocks, style, aspectRatio, fontLoadedTick, videoRef]);
 
   const showInstagram = safeZoneMode === 'instagram' || safeZoneMode === 'both';
   const showTikTok = safeZoneMode === 'tiktok' || safeZoneMode === 'both';

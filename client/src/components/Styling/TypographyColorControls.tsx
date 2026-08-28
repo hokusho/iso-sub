@@ -163,10 +163,10 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
       </div>
 
       {/* 2. GRID COMPACTO LADO A LADO: PESO VISUAL + TAMANHO + CAIXA DO TEXTO COM DROPDOWN VISUAL */}
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-3 gap-2">
         {/* Dropdown Visual de Peso da Fonte */}
-        <div ref={weightDropdownRef} className="flex flex-col gap-1 bg-neutral-100 p-2.5 rounded-xl border-2 border-neutral-300 relative">
-          <span className="text-xs font-black text-neutral-900">Peso (Weight)</span>
+        <div ref={weightDropdownRef} className="flex flex-col gap-1 bg-neutral-100 p-2 rounded-xl border-2 border-neutral-300 relative">
+          <span className="text-[11px] font-black text-neutral-900 truncate">Peso</span>
           
           <button
             type="button"
@@ -175,10 +175,10 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
               setIsFontDropdownOpen(false);
               setIsCaseDropdownOpen(false);
             }}
-            className="w-full bg-white hover:bg-neutral-50 border-2 border-neutral-300 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-xs text-neutral-900 shadow-sm transition"
+            className="w-full bg-white hover:bg-neutral-50 border border-neutral-300 rounded-lg px-2 py-1 flex items-center justify-between text-xs text-neutral-900 shadow-sm transition"
           >
             <span
-              className="truncate font-bold"
+              className="truncate font-bold text-xs"
               style={{
                 fontFamily: `"${currentFontMeta.name}", sans-serif`,
                 fontWeight: currentWeight
@@ -186,12 +186,12 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
             >
               {weightLabels[currentWeight] || `${currentWeight}`}
             </span>
-            <ChevronDown className={`w-3.5 h-3.5 text-neutral-700 transition-transform ${isWeightDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3 h-3 text-neutral-700 transition-transform shrink-0 ${isWeightDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Visual Weight Dropdown Popover */}
           {isWeightDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white border-2 border-neutral-400 rounded-xl p-1.5 shadow-2xl z-40 min-w-[200px] flex flex-col gap-1">
+            <div className="absolute top-full left-0 mt-1 bg-white border-2 border-neutral-400 rounded-xl p-1.5 shadow-2xl z-40 min-w-[180px] flex flex-col gap-1">
               {currentFontMeta.weights.map((w) => {
                 const isSelected = currentWeight === w;
                 return (
@@ -237,23 +237,23 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
         </div>
 
         {/* Tamanho da Fonte */}
-        <div className="flex flex-col gap-1 bg-neutral-100 p-2.5 rounded-xl border-2 border-neutral-300">
+        <div className="flex flex-col gap-1 bg-neutral-100 p-2 rounded-xl border-2 border-neutral-300">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-black text-neutral-900">Tamanho da Fonte</span>
-            <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-lg border border-neutral-300 shadow-sm">
+            <span className="text-[11px] font-black text-neutral-900 truncate">Tamanho</span>
+            <div className="flex items-center gap-0.5 bg-white px-1 py-0.5 rounded-md border border-neutral-300 shadow-sm">
               <button
                 type="button"
                 onClick={() => onChange({ fontSize: Math.max(10, (style.fontSize || 20) - 1) })}
-                className="w-4 h-4 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-xs cursor-pointer"
+                className="w-3.5 h-3.5 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-[11px] cursor-pointer"
                 title="Diminuir 1px"
               >
                 −
               </button>
-              <span className="text-xs font-mono font-black text-neutral-900 px-1">{style.fontSize}px</span>
+              <span className="text-[11px] font-mono font-black text-neutral-900 px-0.5">{style.fontSize}</span>
               <button
                 type="button"
                 onClick={() => onChange({ fontSize: Math.min(96, (style.fontSize || 20) + 1) })}
-                className="w-4 h-4 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-xs cursor-pointer"
+                className="w-3.5 h-3.5 flex items-center justify-center font-black text-neutral-700 hover:text-black hover:bg-neutral-100 rounded text-[11px] cursor-pointer"
                 title="Aumentar 1px"
               >
                 +
@@ -272,8 +272,8 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
         </div>
 
         {/* Dropdown Visual de Caixa do Texto (Maiúsculas / Minúsculas) */}
-        <div ref={caseDropdownRef} className="flex flex-col gap-1 bg-neutral-100 p-2.5 rounded-xl border-2 border-neutral-300 relative">
-          <span className="text-xs font-black text-neutral-900">Caixa do Texto</span>
+        <div ref={caseDropdownRef} className="flex flex-col gap-1 bg-neutral-100 p-2 rounded-xl border-2 border-neutral-300 relative">
+          <span className="text-[11px] font-black text-neutral-900 truncate">Caixa</span>
           
           <button
             type="button"
@@ -282,12 +282,12 @@ export const TypographyColorControls: React.FC<TypographyColorControlsProps> = (
               setIsFontDropdownOpen(false);
               setIsWeightDropdownOpen(false);
             }}
-            className="w-full bg-white hover:bg-neutral-50 border-2 border-neutral-300 rounded-lg px-2.5 py-1.5 flex items-center justify-between text-xs text-neutral-900 shadow-sm transition"
+            className="w-full bg-white hover:bg-neutral-50 border border-neutral-300 rounded-lg px-2 py-1 flex items-center justify-between text-xs text-neutral-900 shadow-sm transition"
           >
-            <span className="font-black truncate">
+            <span className="font-black truncate text-xs">
               {currentCaseOption.label}
             </span>
-            <ChevronDown className={`w-3.5 h-3.5 text-neutral-700 transition-transform ${isCaseDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3 h-3 text-neutral-700 transition-transform shrink-0 ${isCaseDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Visual Case Dropdown Popover */}

@@ -824,6 +824,34 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleStyleChange = (updated: Partial<SubtitleStyle>) => {
+    setStyle(prev => ({ ...prev, ...updated }));
+
+    if (updated.caseTransform) {
+      const ct = updated.caseTransform;
+      const transform = (str: string) => {
+        if (!str) return '';
+        if (ct === 'uppercase') return str.toUpperCase();
+        if (ct === 'lowercase') return str.toLowerCase();
+        if (ct === 'capitalize') {
+          return str.toLowerCase().replace(/(^|\s|\p{P})\p{L}/gu, (m) => m.toUpperCase());
+        }
+        return str;
+      };
+
+      setBlocks(prevBlocks =>
+        prevBlocks.map(b => ({
+          ...b,
+          text: transform(b.text),
+          words: (b.words || []).map(w => ({
+            ...w,
+            text: transform(w.text)
+          }))
+        }))
+      );
+    }
+  };
+
   const handleOpenExplorer = async () => {
     try {
       const res = await fetch(apiEndpoint('/api/open-folder'), { method: 'POST' });
@@ -968,7 +996,28 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#f4f5f7] text-slate-900 overflow-hidden font-sans select-none">
+    <div className="flex flex-col h-screen w-screen min-w-[1024px] bg-[#f4f5f7] text-slate-900 overflow-hidden font-sans select-none">
+      {/* Hidden Web Font Preloaders to force browser network engine to load all Canvas fonts */}
+      <div aria-hidden="true" className="fixed -top-96 -left-96 opacity-0 pointer-events-none select-none h-0 w-0 overflow-hidden">
+        <span style={{ fontFamily: 'Montserrat', fontWeight: 800 }}>.</span>
+        <span style={{ fontFamily: 'Montserrat', fontWeight: 900 }}>.</span>
+        <span style={{ fontFamily: 'Montserrat', fontWeight: 700 }}>.</span>
+        <span style={{ fontFamily: 'Montserrat', fontWeight: 600 }}>.</span>
+        <span style={{ fontFamily: 'Montserrat', fontWeight: 400 }}>.</span>
+        <span style={{ fontFamily: 'Anton', fontWeight: 400 }}>.</span>
+        <span style={{ fontFamily: 'Bebas Neue', fontWeight: 400 }}>.</span>
+        <span style={{ fontFamily: 'Poppins', fontWeight: 800 }}>.</span>
+        <span style={{ fontFamily: 'Poppins', fontWeight: 900 }}>.</span>
+        <span style={{ fontFamily: 'Poppins', fontWeight: 700 }}>.</span>
+        <span style={{ fontFamily: 'Inter', fontWeight: 800 }}>.</span>
+        <span style={{ fontFamily: 'Inter', fontWeight: 900 }}>.</span>
+        <span style={{ fontFamily: 'Oswald', fontWeight: 700 }}>.</span>
+        <span style={{ fontFamily: 'Rubik', fontWeight: 800 }}>.</span>
+        <span style={{ fontFamily: 'Syne', fontWeight: 800 }}>.</span>
+        <span style={{ fontFamily: 'Archivo Black', fontWeight: 400 }}>.</span>
+        <span style={{ fontFamily: 'Roboto', fontWeight: 700 }}>.</span>
+      </div>
+
       {/* Hidden Media File Input */}
       <input
         ref={fileInputRef}
@@ -1146,8 +1195,8 @@ export const App: React.FC = () => {
           )}
         </div>
 
-        {/* Right Sidebar: Tabs for Presets, Styles, Words & Script (Widened & Spacious) */}
-        <div className="w-[460px] lg:w-[500px] xl:w-[540px] 2xl:w-[580px] flex flex-col bg-white border-l border-neutral-300 shrink-0 select-none overflow-hidden transition-all shadow-sm">
+        {/* Right Sidebar: Tabs for Styles, Words & Script (Solid, Stable Width across all resolutions) */}
+        <div className="w-[480px] xl:w-[520px] 2xl:w-[540px] flex flex-col bg-white border-l border-neutral-300 shrink-0 select-none overflow-hidden transition-all shadow-sm">
           {/* Tab Navigation Header */}
           <div className="flex items-center border-b border-neutral-300 bg-neutral-100 p-2.5 gap-2 shrink-0">
             <button
@@ -1194,15 +1243,15 @@ export const App: React.FC = () => {
                 <PresetPicker currentStyle={style} onSelectPreset={handleSelectPreset} />
                 <PositionControls
                   style={style}
-                  onChange={(u) => setStyle((s) => ({ ...s, ...u }))}
+                  onChange={handleStyleChange}
                 />
                 <TypographyColorControls
                   style={style}
-                  onChange={(u) => setStyle((s) => ({ ...s, ...u }))}
+                  onChange={handleStyleChange}
                 />
                 <EffectsControls
                   style={style}
-                  onChange={(u) => setStyle((s) => ({ ...s, ...u }))}
+                  onChange={handleStyleChange}
                 />
               </div>
             )}
@@ -1221,7 +1270,7 @@ export const App: React.FC = () => {
                 onDeleteWord={handleDeleteWord}
                 onAddWord={handleAddWord}
                 onApplyBlocks={setBlocks}
-                onStyleChange={(u) => setStyle((s) => ({ ...s, ...u }))}
+                onStyleChange={handleStyleChange}
                 onSeek={seek}
               />
             )}

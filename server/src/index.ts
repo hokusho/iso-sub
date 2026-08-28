@@ -108,7 +108,14 @@ app.use((req, res, next) => {
   next();
 });
 
-app.listen(PORT, HOST, () => {
+import { ensureFontsDownloaded } from './services/fontService';
+
+app.listen(PORT, HOST, async () => {
   console.log(`🚀 Animated Subtitles Server running on http://${HOST}:${PORT}`);
   console.log(`📁 Media storage path: ${STORAGE_DIR}`);
+  try {
+    await ensureFontsDownloaded();
+  } catch (err: any) {
+    console.warn('Font download warning on startup:', err.message);
+  }
 });
